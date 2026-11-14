@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Quantum | Protocol Executive Console</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Ethers.js v6 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.umd.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            quantum: {
+              DEFAULT: '#8B72FF',
+              light: '#B4A2FF',
+              dark: '#6C5CE7',
+              glow: 'rgba(139, 114, 255, 0.35)'
+            },
+            darkBg: '#06070B',
+            cardBg: '#0E111A',
+            borderCol: '#1E2436'
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Inter', 'Segoe UI', 'sans-serif'],
+            mono: ['SFMono-Regular', 'JetBrains Mono', 'Menlo', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      background-color: #05060A;
+      color: #F3F4F6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      -webkit-tap-highlight-color: transparent;
+      overflow-x: hidden;
+    }
+
+    /* ===================================================================== */
+    /* ANIMATED AMBIENT AURORA & QUANTUM GRID BACKGROUND                     */
+    /* ===================================================================== */
+    .ambient-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 0%, #0d101d 0%, #05060a 75%);
+      pointer-events: none;
+    }
+
+    .aurora-orb {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(110px);
+      opacity: 0.38;
+      will-change: transform;
+      animation: floatAurora 22s infinite alternate ease-in-out;
+    }
+
+    .orb-1 {
+      width: 48vw;
+      height: 48vw;
+      max-width: 580px;
+      max-height: 580px;
+      background: radial-gradient(circle, #8B72FF 0%, rgba(108, 92, 231, 0) 70%);
+      top: -12%;
+      left: -10%;
+    }
+
+    .orb-2 {
+      width: 42vw;
+      height: 42vw;
+      max-width: 520px;
+      max-height: 520px;
+      background: radial-gradient(circle, #10B981 0%, rgba(16, 185, 129, 0) 70%);
+      bottom: -15%;
+      right: -8%;
+      opacity: 0.22;
+      animation-delay: -7s;
+      animation-duration: 26s;
+    }
+
+    .orb-3 {
+      width: 36vw;
+      height: 36vw;
+      max-width: 440px;
+      max-height: 440px;
+      background: radial-gradient(circle, #6366F1 0%, rgba(99, 102, 241, 0) 70%);
+      top: 38%;
+      left: 55%;
+      opacity: 0.24;
+      animation-delay: -13s;
+      animation-duration: 30s;
+    }
+
+    .bg-grid-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 25%, #000 40%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 25%, #000 40%, transparent 100%);
+      pointer-events: none;
+    }
+
+    @keyframes floatAurora {
+      0% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(4%, 6%, 0) scale(1.08); }
+      100% { transform: translate3d(-3%, -5%, 0) scale(0.95); }
+    }
+
+    /* ===================================================================== */
+    /* MACOS SONOMA / WEB3 SPECULAR GLASS CARDS                              */
+    /* ===================================================================== */
+    .glass-card {
+      background: linear-gradient(165deg, rgba(22, 27, 42, 0.78) 0%, rgba(12, 15, 24, 0.88) 100%);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.075);
+      box-shadow: 
+        0 20px 45px -15px rgba(0, 0, 0, 0.65),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.11);
+      transition: border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+    }
+
+    .glass-card-interactive:hover {
+      border-color: rgba(139, 114, 255, 0.28);
+      box-shadow: 
+        0 24px 50px -12px rgba(0, 0, 0, 0.75),
+        0 0 25px -5px rgba(139, 114, 255, 0.12),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+    }
+
+    /* Subtle Recessed Input Styling (macOS Native Feel) */
+    .quantum-input {
+      background: rgba(6, 8, 13, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+      transition: all 0.2s ease;
+    }
+
+    .quantum-input:focus {
+      background: rgba(10, 13, 22, 0.95);
+      border-color: #8B72FF;
+      box-shadow: 0 0 0 3px rgba(139, 114, 255, 0.18), inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+
+    .quantum-input-emerald:focus {
+      border-color: #10B981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+
+    .quantum-input-rose:focus {
+      border-color: #F43F5E;
+      box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.18), inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Active Pill Tab */
+    .tab-active {
+      background: linear-gradient(135deg, #9680FF 0%, #6C5CE7 100%);
+      color: #FFFFFF !important;
+      font-weight: 600;
+      box-shadow: 
+        0 4px 16px -2px rgba(139, 114, 255, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    /* Tab Content Entrance Animation */
+    .tab-content:not(.hidden) {
+      animation: tabFadeSlide 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .trade-range-active { color: #fff; background: rgba(139,114,255,.2); box-shadow: inset 0 0 0 1px rgba(139,114,255,.3); }
+
+    @keyframes tabFadeSlide {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.992);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Button Tactile Physics */
+    .btn-tactile {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-tactile:hover {
+      transform: translateY(-1px);
+    }
+    .btn-tactile:active {
+      transform: translateY(0px) scale(0.98);
+    }
+
+    /* Prevent iOS Input Auto-Zoom on mobile while preserving crisp desktop sizes */
+    @media screen and (max-width: 640px) {
+      input[type="text"], input[type="number"] {
+        font-size: 16px !important;
+      }
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="min-h-screen pb-20 selection:bg-quantum selection:text-white relative">
+
+  <!-- DYNAMIC AMBIENT BACKGROUND -->
+  <div class="ambient-canvas">
+    <div class="aurora-orb orb-1"></div>
+    <div class="aurora-orb orb-2"></div>
+    <div class="aurora-orb orb-3"></div>
+  </div>
+  <div class="bg-grid-overlay"></div>
+
+  <!-- ===================================================================== -->
+  <!-- 1. AUTHENTICATION GATE (ONLY OWNER OR ADMIN CAN ENTER)                -->
+  <!-- ===================================================================== -->
+  <div id="authGateScreen" class="min-h-screen flex flex-col items-center justify-center px-4 py-10 relative z-10">
+    
+    <div class="w-full max-w-md glass-card rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden">
+      <!-- Top Specular Glow Bar -->
+      <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-32 bg-quantum/25 blur-3xl pointer-events-none"></div>
+
+      <!-- macOS Window Decorative Header Bar -->
+      <div class="flex items-center justify-between border-b border-white/[0.06] pb-4">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80 border border-rose-400/30"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 border border-amber-400/30"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 border border-emerald-400/30"></span>
+        </div>
+        <span class="text-[11px] font-mono text-gray-400 flex items-center gap-1.5">
+          <i data-lucide="lock" class="w-3 h-3 text-quantum-light"></i>
+          quantum://auth-gate
+        </span>
+      </div>
+
+      <!-- Quantum Logo & Header -->
+      <div class="flex items-center gap-4 pt-1">
+        <div class="relative group shrink-0">
+          <div class="absolute -inset-1 rounded-2xl bg-gradient-to-tr from-quantum to-emerald-400 opacity-35 blur group-hover:opacity-60 transition duration-500"></div>
+          <div class="relative w-14 h-14 rounded-2xl bg-[#0B0E17] border border-quantum/40 flex items-center justify-center shadow-inner">
+            <svg viewBox="0 0 120 120" class="w-9 h-9 drop-shadow-[0_0_10px_rgba(139,114,255,0.5)]" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M52 16H34L14 60L34 104H52L43 85L30 60L45 28L62 60L48 88H65L84 52L66 16H52Z" fill="#8B72FF"/>
+              <path d="M68 104H86L106 60L86 16H68L77 35L90 60L75 92L58 60L72 32H55L36 68L54 104H68Z" fill="#B4A2FF" fill-opacity="0.9"/>
+            </svg>
+          </div>
+        </div>
+        <div>
+          <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-quantum/10 border border-quantum/25 text-quantum-light text-[10px] font-semibold tracking-wider uppercase mb-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-quantum-light animate-pulse"></span>
+            BSC Mainnet
+          </div>
+          <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-white">QUANTUM ADMIN</h1>
+          <p class="text-xs text-gray-400">Executive Owner & Admin Access</p>
+        </div>
+      </div>
+
+      <!-- Error / Denied Alert -->
+      <div id="authErrorBox" class="hidden rounded-xl p-3.5 bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200 space-y-1 backdrop-blur-md">
+        <div class="flex items-center gap-1.5 font-bold text-rose-400">
+          <i data-lucide="shield-alert" class="w-4 h-4"></i>
+          <span id="authErrorTitle">Access Denied</span>
+        </div>
+        <p id="authErrorDesc" class="text-rose-200/90 leading-relaxed pl-5"></p>
+      </div>
+
+      <!-- Connect Button -->
+      <button onclick="authenticateAndUnlock()" class="btn-tactile w-full bg-gradient-to-r from-quantum via-[#7B61FF] to-quantum-dark hover:brightness-110 text-white font-semibold text-sm py-3.5 rounded-xl flex items-center justify-center gap-2.5 shadow-[0_10px_25px_-5px_rgba(139,114,255,0.45)] border border-white/15">
+        <i data-lucide="wallet" class="w-4 h-4"></i>
+        <span id="gateConnectBtnText">Connect Wallet & Verify</span>
+      </button>
+
+      <!-- Mobile MetaMask App Redirect -->
+      <div id="gateMobileDeepLink" class="hidden pt-3 border-t border-white/[0.06]">
+        <button onclick="openInMetaMaskMobile()" class="btn-tactile w-full bg-white/[0.03] hover:bg-white/[0.07] text-quantum-light border border-quantum/30 font-medium text-xs py-3 rounded-xl flex items-center justify-center gap-2">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          <span>Open in MetaMask Mobile Browser</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- 2. MAIN ADMIN PANEL (MAC & MOBILE OPTIMIZED EXECUTIVE SUITE)          -->
+  <!-- ===================================================================== -->
+  <div id="dashboardWrapper" class="hidden relative z-10">
+
+    <!-- FLOATING MAC-STYLE TOP NAVBAR -->
+    <header class="sticky top-0 z-40 backdrop-blur-2xl bg-[#07090F]/80 border-b border-white/[0.07] px-3.5 sm:px-6 py-3 transition-all">
+      <div class="max-w-5xl mx-auto flex items-center justify-between gap-3">
+        
+        <!-- Left Brand & Token Identity -->
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-quantum/20 to-quantum/5 border border-quantum/40 flex items-center justify-center shrink-0 shadow-inner">
+            <svg viewBox="0 0 120 120" class="w-6 h-6" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M52 16H34L14 60L34 104H52L43 85L30 60L45 28L62 60L48 88H65L84 52L66 16H52Z" fill="#8B72FF"/>
+              <path d="M68 104H86L106 60L86 16H68L77 35L90 60L75 92L58 60L72 32H55L36 68L54 104H68Z" fill="#B4A2FF"/>
+            </svg>
+          </div>
+          <div class="truncate">
+            <div class="flex items-center gap-2">
+              <span id="uiTokenName" class="font-bold text-sm sm:text-base text-white tracking-tight truncate">QUANTUM</span>
+              <span id="uiTokenSymbol" class="text-[10px] px-2 py-0.5 rounded-full bg-quantum/15 border border-quantum/30 text-quantum-light font-mono font-semibold">QTM</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px] text-gray-400 mt-0.5">
+              <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span id="uiConnectedWallet" class="font-mono text-gray-300">0x...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Role & Quick Actions -->
+        <div class="flex items-center gap-2 shrink-0">
+          <span id="roleBadge" class="text-[10px] px-2.5 py-1 rounded-lg font-bold uppercase tracking-wider border shadow-sm"></span>
+          
+          <button onclick="refreshDashboardData()" class="btn-tactile p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-gray-200 transition" title="Sync Blockchain Data">
+            <i data-lucide="refresh-cw" id="refreshIcon" class="w-4 h-4 text-quantum-light"></i>
+          </button>
+          
+          <button onclick="lockSession()" class="btn-tactile p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-400 transition" title="Disconnect Session">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="max-w-5xl mx-auto px-3.5 sm:px-6 pt-5 space-y-5">
+
+      <!-- ================================================================= -->
+      <!-- BENTO TELEMETRY METRICS (RESPONSIVE 2x2 MOBILE / 4-COL DESKTOP)   -->
+      <!-- ================================================================= -->
+      <section class="glass-card rounded-2xl p-3.5 sm:p-4">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          
+          <!-- Buy Fee Metric -->
+          <div class="rounded-xl bg-white/[0.025] border border-white/[0.05] p-3 flex flex-col justify-between relative overflow-hidden group">
+            <div class="absolute -right-4 -top-4 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div class="flex items-center justify-between text-[11px] text-gray-400 font-medium">
+              <span>Buy Tax</span>
+              <i data-lucide="arrow-down-left" class="w-3.5 h-3.5 text-emerald-400"></i>
+            </div>
+            <span id="statBuyPercent" class="text-lg sm:text-2xl font-extrabold text-emerald-400 font-mono mt-1 tracking-tight">--%</span>
+          </div>
+
+          <!-- Sell Fee Metric -->
+          <div class="rounded-xl bg-white/[0.025] border border-white/[0.05] p-3 flex flex-col justify-between relative overflow-hidden group">
+            <div class="absolute -right-4 -top-4 w-16 h-16 bg-rose-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div class="flex items-center justify-between text-[11px] text-gray-400 font-medium">
+              <span>Sell Tax</span>
+              <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-rose-400"></i>
+            </div>
+            <span id="statSellPercent" class="text-lg sm:text-2xl font-extrabold text-rose-400 font-mono mt-1 tracking-tight">--%</span>
+          </div>
+
+          <!-- Transfer Status Metric -->
+          <div class="rounded-xl bg-white/[0.025] border border-white/[0.05] p-3 flex flex-col justify-between relative overflow-hidden">
+            <div class="flex items-center justify-between text-[11px] text-gray-400 font-medium">
+              <span>Transfers</span>
+              <i data-lucide="activity" class="w-3.5 h-3.5 text-quantum-light"></i>
+            </div>
+            <span id="statPaused" class="text-sm sm:text-lg font-bold text-emerald-400 mt-1.5 block truncate">--</span>
+          </div>
+
+          <!-- Total Supply Metric -->
+          <div class="rounded-xl bg-white/[0.025] border border-white/[0.05] p-3 flex flex-col justify-between relative overflow-hidden">
+            <div class="flex items-center justify-between text-[11px] text-gray-400 font-medium">
+              <span>Total Supply</span>
+              <i data-lucide="coins" class="w-3.5 h-3.5 text-amber-400"></i>
+            </div>
+            <span id="statTotalSupply" class="text-sm sm:text-lg font-bold text-white font-mono mt-1.5 block truncate">--</span>
+          </div>
+
+        </div>
+
+        <!-- Secondary Slim Telemetry Bar -->
+        <div class="mt-3 pt-2.5 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-400 px-1">
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="crown" class="w-3.5 h-3.5 text-amber-400/80"></i>
+            <span>Owner:</span>
+            <span id="statOwner" class="font-mono text-gray-200 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.05]">--</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="cpu" class="w-3.5 h-3.5 text-quantum-light/80"></i>
+            <span>Contract:</span>
+            <span id="headerContractShort" class="font-mono text-gray-200 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.05]">--</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- MACOS SEGMENTED CONTROL PILL TABS (TOUCH-SCROLLABLE ON MOBILE)    -->
+      <!-- ================================================================= -->
+      <nav class="flex overflow-x-auto no-scrollbar gap-1.5 p-1.5 glass-card rounded-2xl">
+        <button onclick="switchTab('taxes')" id="tabBtn-taxes" class="tab-btn tab-active flex-1 shrink-0 px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200">
+          <i data-lucide="percent" class="w-3.5 h-3.5"></i>
+          <span>Taxes & Split</span>
+        </button>
+        <button onclick="switchTab('security')" id="tabBtn-security" class="tab-btn text-gray-400 hover:text-white hover:bg-white/[0.04] flex-1 shrink-0 px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+          <span>Security & Pause</span>
+        </button>
+        <button onclick="switchTab('access')" id="tabBtn-access" class="tab-btn text-gray-400 hover:text-white hover:bg-white/[0.04] flex-1 shrink-0 px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200">
+          <i data-lucide="users" class="w-3.5 h-3.5"></i>
+          <span>Access Roles</span>
+        </button>
+        <button onclick="switchTab('dex')" id="tabBtn-dex" class="tab-btn text-gray-400 hover:text-white hover:bg-white/[0.04] flex-1 shrink-0 px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200">
+          <i data-lucide="chart-no-axes-combined" class="w-3.5 h-3.5"></i>
+          <span>Trades</span>
+        </button>
+        <button onclick="switchTab('ownership')" id="tabBtn-ownership" class="tab-btn text-gray-400 hover:text-white hover:bg-white/[0.04] flex-1 shrink-0 px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200">
+          <i data-lucide="crown" class="w-3.5 h-3.5"></i>
+          <span>Ownership & Burn</span>
+        </button>
+      </nav>
+
+      <!-- ================================================================= -->
+      <!-- TAB 1: TAXES & DISTRIBUTION                                       -->
+      <!-- ================================================================= -->
+      <div id="tab-taxes" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- BUY TAX CARD -->
+        <div class="glass-card glass-card-interactive rounded-2xl p-5 space-y-5 relative overflow-hidden">
+          <div class="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent"></div>
+
+          <div class="flex items-center justify-between border-b border-white/[0.07] pb-3.5">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <i data-lucide="trending-down" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-white">Buy Tax Settings</h2>
+                <p class="text-[11px] text-gray-400">Incoming DEX purchase fee</p>
+              </div>
+            </div>
+            <span class="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+              Active: <strong id="cardBuyPercent">--%</strong>
+            </span>
+          </div>
+
+          <!-- Buy Fee Input -->
+          <div class="space-y-2">
+            <label class="text-xs font-medium text-gray-300">Buy Tax Percentage (%)</label>
+            <div class="flex gap-2.5">
+              <input id="inputBuyPercent" type="number" min="0" max="100" placeholder="e.g. 3" 
+                class="w-full quantum-input quantum-input-emerald rounded-xl px-3.5 py-2.5 text-sm font-mono text-white outline-none" />
+              <button onclick="handleSetBuyPercent()" class="btn-tactile shrink-0 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20">
+                Update Fee
+              </button>
+            </div>
+          </div>
+
+          <!-- Buy Distribution Wallets -->
+          <div class="space-y-3.5 pt-3.5 border-t border-white/[0.07]">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-gray-300 font-semibold flex items-center gap-1.5">
+                <i data-lucide="split" class="w-3.5 h-3.5 text-emerald-400"></i>
+                Fee Distribution Wallets
+              </span>
+              <span id="statBuySplit" class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Split: -- / --</span>
+            </div>
+
+            <!-- Wallet 1 Row -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-[11px] text-gray-400 px-0.5">
+                <span>Primary Recipient (Wallet 1)</span>
+                <span>Share (%)</span>
+              </div>
+              <div class="grid grid-cols-4 gap-2">
+                <input id="buyW1Addr" type="text" placeholder="0x..." class="col-span-3 quantum-input quantum-input-emerald rounded-xl px-3 py-2.5 text-xs font-mono text-white outline-none" />
+                <input id="buyW1Share" type="number" min="0" max="100" placeholder="%" class="col-span-1 quantum-input quantum-input-emerald rounded-xl px-2.5 py-2.5 text-xs font-mono text-center text-white outline-none" />
+              </div>
+            </div>
+
+            <!-- Wallet 2 Row -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-[11px] text-gray-400 px-0.5">
+                <span>Secondary Recipient (Wallet 2)</span>
+                <span>Share (%)</span>
+              </div>
+              <div class="grid grid-cols-4 gap-2">
+                <input id="buyW2Addr" type="text" placeholder="0x..." class="col-span-3 quantum-input quantum-input-emerald rounded-xl px-3 py-2.5 text-xs font-mono text-white outline-none" />
+                <input id="buyW2Share" type="number" min="0" max="100" placeholder="%" class="col-span-1 quantum-input quantum-input-emerald rounded-xl px-2.5 py-2.5 text-xs font-mono text-center text-white outline-none" />
+              </div>
+            </div>
+
+            <button onclick="handleSetBuyDistribution()" class="btn-tactile w-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-semibold text-xs py-3 rounded-xl flex items-center justify-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              <span>Save Buy Distribution</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SELL TAX CARD -->
+        <div class="glass-card glass-card-interactive rounded-2xl p-5 space-y-5 relative overflow-hidden">
+          <div class="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-rose-400/60 to-transparent"></div>
+
+          <div class="flex items-center justify-between border-b border-white/[0.07] pb-3.5">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                <i data-lucide="trending-up" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-white">Sell Tax Settings</h2>
+                <p class="text-[11px] text-gray-400">Outgoing DEX sale fee</p>
+              </div>
+            </div>
+            <span class="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/25">
+              Active: <strong id="cardSellPercent">--%</strong>
+            </span>
+          </div>
+
+          <!-- Sell Fee Input -->
+          <div class="space-y-2">
+            <label class="text-xs font-medium text-gray-300">Sell Tax Percentage (%)</label>
+            <div class="flex gap-2.5">
+              <input id="inputSellPercent" type="number" min="0" max="100" placeholder="e.g. 5" 
+                class="w-full quantum-input quantum-input-rose rounded-xl px-3.5 py-2.5 text-sm font-mono text-white outline-none" />
+              <button onclick="handleSetSellPercent()" class="btn-tactile shrink-0 bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-rose-500/20">
+                Update Fee
+              </button>
+            </div>
+          </div>
+
+          <!-- Sell Distribution Wallets -->
+          <div class="space-y-3.5 pt-3.5 border-t border-white/[0.07]">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-gray-300 font-semibold flex items-center gap-1.5">
+                <i data-lucide="split" class="w-3.5 h-3.5 text-rose-400"></i>
+                Fee Distribution Wallets
+              </span>
+              <span id="statSellSplit" class="text-[11px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">Split: -- / --</span>
+            </div>
+
+            <!-- Wallet 1 Row -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-[11px] text-gray-400 px-0.5">
+                <span>Primary Recipient (Wallet 1)</span>
+                <span>Share (%)</span>
+              </div>
+              <div class="grid grid-cols-4 gap-2">
+                <input id="sellW1Addr" type="text" placeholder="0x..." class="col-span-3 quantum-input quantum-input-rose rounded-xl px-3 py-2.5 text-xs font-mono text-white outline-none" />
+                <input id="sellW1Share" type="number" min="0" max="100" placeholder="%" class="col-span-1 quantum-input quantum-input-rose rounded-xl px-2.5 py-2.5 text-xs font-mono text-center text-white outline-none" />
+              </div>
+            </div>
+
+            <!-- Wallet 2 Row -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-[11px] text-gray-400 px-0.5">
+                <span>Secondary Recipient (Wallet 2)</span>
+                <span>Share (%)</span>
+              </div>
+              <div class="grid grid-cols-4 gap-2">
+                <input id="sellW2Addr" type="text" placeholder="0x..." class="col-span-3 quantum-input quantum-input-rose rounded-xl px-3 py-2.5 text-xs font-mono text-white outline-none" />
+                <input id="sellW2Share" type="number" min="0" max="100" placeholder="%" class="col-span-1 quantum-input quantum-input-rose rounded-xl px-2.5 py-2.5 text-xs font-mono text-center text-white outline-none" />
+              </div>
+            </div>
+
+            <button onclick="handleSetSellDistribution()" class="btn-tactile w-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-semibold text-xs py-3 rounded-xl flex items-center justify-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              <span>Save Sell Distribution</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- TAB 2: SECURITY & PAUSE (NO PERMANENT DISABLE BUTTONS)            -->
+      <!-- ================================================================= -->
+      <div id="tab-security" class="tab-content hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- PAUSE / UNPAUSE TRANSFERS -->
+        <div class="glass-card glass-card-interactive rounded-2xl p-5 space-y-5">
+          <div class="flex items-center justify-between border-b border-white/[0.07] pb-3.5">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-white">Transfer Pause Control</h2>
+                <p class="text-[11px] text-gray-400">Emergency circuit breaker for token movement</p>
+              </div>
+            </div>
+            <span id="badgePauseState" class="text-xs px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-gray-200 font-mono font-semibold">--</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <button onclick="handlePause()" class="btn-tactile bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-amber-500/5">
+              <i data-lucide="pause-circle" class="w-4 h-4"></i>
+              <span>Pause Transfers</span>
+            </button>
+            <button onclick="handleUnpause()" class="btn-tactile bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/5">
+              <i data-lucide="play-circle" class="w-4 h-4"></i>
+              <span>Resume Transfers</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- TRADING SECURITY RATE -->
+        <div class="glass-card glass-card-interactive rounded-2xl p-5 space-y-5">
+          <div class="flex items-center justify-between border-b border-white/[0.07] pb-3.5">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-quantum/15 border border-quantum/30 flex items-center justify-center text-quantum-light">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-white">Trading Security Limit</h2>
+                <p class="text-[11px] text-gray-400">Protocol Max Cap: <strong id="secCardMax" class="text-gray-200 font-mono">--%</strong></p>
+              </div>
+            </div>
+            <span class="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-quantum/15 text-quantum-light border border-quantum/30">
+              Active: <strong id="secCardCurrent">--%</strong>
+            </span>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-medium text-gray-300">Trading Security Percentage (%)</label>
+            <div class="flex gap-2.5">
+              <input id="inputTradingSecurity" type="number" min="0" max="100" placeholder="e.g. 10" 
+                class="w-full quantum-input rounded-xl px-3.5 py-2.5 text-sm font-mono text-white outline-none" />
+              <button onclick="handleSetTradingSecurity()" class="btn-tactile shrink-0 bg-gradient-to-r from-quantum to-quantum-dark text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-quantum/25">
+                Update Limit
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- TAB 3: ADMIN & WHITELIST ACCESS                                   -->
+      <!-- ================================================================= -->
+      <div id="tab-access" class="tab-content hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- ADMIN MANAGEMENT -->
+        <div class="glass-card glass-card-interactive rounded-2xl p-5 space-y-4">
+          <div class="flex items-center gap-2.5 border-b border-white/[0.07] pb-3.5">
+            <div class="w-8 h-8 rounded-lg bg-quantum/15 border border-quantum/30 flex items-center justify-center text-quantum-light">
+              <i data-lucide="user-cog" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-white">Admin Management</h2>
+              <p class="text-[11px] text-gray-400">Verify, grant, or revoke operator permissions</p>
+            </div>
+          </div>
+
+          <input id="adminTargetAddr" type="text" placeholder="0x... Enter Wallet Address" 
+            class="w-full quantum-input rounded-xl px-3.5 py-3 text-xs font-mono text-white outline-none" />
+
+          <div id="adminCheckResult" class="hidden p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs font-mono"></div>
+
+          <div class="grid grid-cols-3 gap-2.5">
+            <button onclick="checkAdminStatus()" class="btn-tactile bg-white/[0.04] hover:bg-white/[0.08] text-gray-200 text-xs font-semibold py-2.5 rounded-xl border border-white/[0.08]">
+              Check Status
+            </button>
+            <button onclick="handleSetAdmin(true)" class="btn-tactile bg-quantum hover:bg-quantum-dark text-white text-xs font-semibold py-2.5 rounded-xl shadow-lg shadow-quantum/20">
+              Add Admin
+            </button>
+            <button onclick="handleSetAdmin(false)" class="btn-tactile bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs font-semibold py-2.5 rounded-xl">
+              Remove
+            </button>
+          </div>
+        </div>
+
+        <!-- WHITELIST MANAGEMENT -->
+        <div class="glass-card glass-card-interactive rounded-2xl p-5 space-y-4">
+          <div class="flex items-center gap-2.5 border-b border-white/[0.07] pb-3.5">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <i data-lucide="badge-check" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-white">Whitelist Management</h2>
+              <p class="text-[11px] text-gray-400">Exempt addresses from taxes & security limits</p>
+            </div>
+          </div>
+
+          <input id="wlTargetAddr" type="text" placeholder="0x... Enter Wallet Address" 
+            class="w-full quantum-input quantum-input-emerald rounded-xl px-3.5 py-3 text-xs font-mono text-white outline-none" />
+
+          <div id="wlCheckResult" class="hidden p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs font-mono"></div>
+
+          <div class="grid grid-cols-3 gap-2.5">
+            <button onclick="checkWhitelistStatus()" class="btn-tactile bg-white/[0.04] hover:bg-white/[0.08] text-gray-200 text-xs font-semibold py-2.5 rounded-xl border border-white/[0.08]">
+              Check Status
+            </button>
+            <button onclick="handleSetWhitelist(true)" class="btn-tactile bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold py-2.5 rounded-xl shadow-lg shadow-emerald-500/20">
+              Add Wallet
+            </button>
+            <button onclick="handleSetWhitelist(false)" class="btn-tactile bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs font-semibold py-2.5 rounded-xl">
+              Remove
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- TAB 4: TOKEN TRADES & PRICE CHART                                 -->
+      <!-- ================================================================= -->
+      <div id="tab-dex" class="tab-content hidden space-y-4 min-w-0">
+        <section class="glass-card rounded-2xl overflow-hidden min-w-0">
+          <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.07]">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.7)]"></span>
+                <h2 class="text-sm sm:text-base font-bold text-white">QTM <span class="text-gray-400 font-medium">/ USD</span></h2>
+                <span class="rounded-md bg-white/[0.05] border border-white/[0.08] px-2 py-1 text-[10px] font-semibold text-gray-300">BNB Chain</span>
+              </div>
+              <p class="text-[10px] text-gray-500 font-mono mt-1.5 truncate">0x1044f6a2299cDB1e48B2BBF259e577BB27eb5f11</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span id="tradesStatus" class="text-[10px] text-gray-500">Connecting to market data…</span>
+              <button onclick="loadTradesData(true)" class="btn-tactile rounded-lg border border-white/[0.09] bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-gray-200 hover:bg-white/[0.08] flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Refresh</button>
+            </div>
+          </div>
+          <div class="p-4 sm:p-5">
+            <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+              <div><p class="text-[10px] uppercase tracking-wider text-gray-500">Token price</p><div id="tradePrice" class="text-2xl sm:text-3xl font-bold font-mono text-white mt-1">--</div><div id="tradeChange" class="text-xs text-gray-500 mt-1">Live market data</div></div>
+              <div class="flex items-center gap-1 rounded-xl border border-white/[0.07] bg-black/20 p-1" role="group" aria-label="Chart timeframe">
+                <button onclick="setTradeInterval('1h', this)" class="trade-range rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-gray-400 hover:text-white">1H</button>
+                <button onclick="setTradeInterval('1d', this)" class="trade-range trade-range-active rounded-lg px-2.5 py-1.5 text-[10px] font-semibold">1D</button>
+                <button onclick="setTradeInterval('1w', this)" class="trade-range rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-gray-400 hover:text-white">1W</button>
+                <button onclick="setTradeInterval('1m', this)" class="trade-range rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-gray-400 hover:text-white">1M</button>
+              </div>
+            </div>
+            <div class="relative w-full h-[240px] sm:h-[320px] rounded-xl bg-[#080a10] border border-white/[0.05] overflow-hidden">
+              <div id="tradeChartLoading" class="absolute inset-0 flex items-center justify-center text-xs text-gray-500">Loading chart data…</div>
+              <svg id="tradeChart" class="w-full h-full" role="img" aria-label="QTM price chart" viewBox="0 0 1000 320" preserveAspectRatio="none"></svg>
+            </div>
+            <div class="flex justify-between mt-2 text-[9px] text-gray-600"><span id="chartStartLabel">--</span><span>Price · USD</span><span id="chartEndLabel">--</span></div>
+          </div>
+        </section>
+
+        <section class="glass-card rounded-2xl overflow-hidden min-w-0">
+          <div class="px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07]">
+            <div class="flex items-center gap-1 rounded-xl border border-white/[0.07] bg-black/20 p-1" role="tablist" aria-label="Market history">
+              <button id="marketTabTrades" onclick="switchMarketHistory('trades')" class="market-history-tab rounded-lg px-3 py-2 text-[11px] font-semibold bg-quantum/20 text-quantum-light" role="tab" aria-selected="true">Trade History</button>
+              <button id="marketTabLiquidity" onclick="switchMarketHistory('liquidity')" class="market-history-tab rounded-lg px-3 py-2 text-[11px] font-semibold text-gray-400 hover:text-white" role="tab" aria-selected="false">Liquidity</button>
+            </div>
+            <div class="flex items-center gap-3"><span id="historySubtitle" class="text-[10px] text-gray-500">Recent on-chain swaps · GeckoTerminal</span><span id="tradeCount" class="text-[10px] text-gray-400 font-mono">-- trades</span><span id="liquidityCount" class="hidden text-[10px] text-gray-400 font-mono">-- events</span><button id="liquidityRefreshButton" onclick="loadLiquidityData(true)" class="hidden btn-tactile rounded-lg border border-white/[0.09] bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-gray-200 hover:bg-white/[0.08] flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Refresh</button></div>
+          </div>
+          <div id="marketTradesPanel" role="tabpanel">
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[700px] text-left text-[11px]">
+              <thead class="bg-white/[0.02] text-[9px] uppercase tracking-wider text-gray-500"><tr><th class="px-4 sm:px-5 py-3 font-semibold">Type / Time</th><th class="px-3 py-3 font-semibold">Price (USD)</th><th class="px-3 py-3 font-semibold">Token amount</th><th class="px-3 py-3 font-semibold">Total (USD)</th><th class="px-3 py-3 font-semibold">Maker</th><th class="px-4 py-3 font-semibold text-right">Transaction</th></tr></thead>
+              <tbody id="tradeRows"><tr><td colspan="6" class="px-5 py-8 text-center text-gray-500">Loading recent trades…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="px-4 sm:px-5 py-3 border-t border-white/[0.06] text-[9px] text-gray-600">Live token data provided by GeckoTerminal API. Scroll horizontally to view all columns on small screens.</div>
+          </div>
+          <div id="marketLiquidityPanel" class="hidden" role="tabpanel">
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[560px] text-left text-[11px]">
+                <thead class="bg-white/[0.02] text-[9px] uppercase tracking-wider text-gray-500"><tr><th class="px-4 sm:px-5 py-3 font-semibold">Event / Block</th><th class="px-3 py-3 font-semibold">QTM amount</th><th class="px-3 py-3 font-semibold">Pair token amount</th><th class="px-4 py-3 font-semibold text-right">Transaction</th></tr></thead>
+                <tbody id="liquidityRows"><tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">Open Liquidity to load recent pool events.</td></tr></tbody>
+              </table>
+            </div>
+            <div class="px-4 sm:px-5 py-3 border-t border-white/[0.06] text-[9px] text-gray-600">Recent PancakeSwap V2 pool liquidity events read from BNB Chain.</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- TAB 5: OWNERSHIP (2-STEP) & TOKEN BURN                            -->
+      <!-- ================================================================= -->
+      <div id="tab-ownership" class="tab-content hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- 2-STEP OWNERSHIP TRANSFER -->
+        <div class="glass-card glass-card-interactive rounded-2xl p-5 space-y-4">
+          <div class="flex items-center gap-2.5 border-b border-white/[0.07] pb-3.5">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <i data-lucide="key-round" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-white">Ownership Transfer (2-Step)</h2>
+              <p class="text-[11px] text-gray-400">Initiate or accept pending contract ownership</p>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] text-xs space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">Current Owner:</span>
+              <span id="ownCardOwner" class="font-mono text-gray-200 bg-white/[0.04] px-2 py-0.5 rounded">--</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">Pending Owner:</span>
+              <span id="ownCardPending" class="font-mono text-quantum-light bg-quantum/10 px-2 py-0.5 rounded">--</span>
+            </div>
+          </div>
+
+          <div class="flex gap-2.5">
+            <input id="newOwnerInput" type="text" placeholder="0x... New Owner Address" 
+              class="w-full quantum-input rounded-xl px-3.5 py-2.5 text-xs font-mono text-white outline-none" />
+            <button onclick="handleTransferOwnership()" class="btn-tactile shrink-0 bg-quantum hover:bg-quantum-dark text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-quantum/20">
+              Transfer
+            </button>
+          </div>
+
+          <button onclick="handleAcceptOwnership()" class="btn-tactile w-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-semibold text-xs py-3 rounded-xl flex items-center justify-center gap-2">
+            <i data-lucide="award" class="w-4 h-4"></i>
+            <span>Accept Ownership (Pending Owner Only)</span>
+          </button>
+        </div>
+
+        <!-- TOKEN BURN -->
+        <div class="glass-card glass-card-interactive rounded-2xl p-5 space-y-4">
+          <div class="border-b border-white/[0.07] pb-3.5 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                <i data-lucide="flame" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-white">Burn Tokens</h2>
+                <p class="text-[11px] text-gray-400">Permanently reduce circulating supply</p>
+              </div>
+            </div>
+            <span id="burnCardBalance" class="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-quantum/10 border border-quantum/25 text-quantum-light">--</span>
+          </div>
+
+          <div class="space-y-2 pt-1">
+            <label class="text-xs font-medium text-gray-300">Amount of Tokens to Burn</label>
+            <div class="flex gap-2.5">
+              <input id="burnAmountInput" type="number" step="any" placeholder="e.g. 10000" 
+                class="w-full quantum-input quantum-input-rose rounded-xl px-3.5 py-3 text-sm font-mono text-white outline-none" />
+              <button onclick="handleBurn()" class="btn-tactile shrink-0 bg-gradient-to-r from-rose-500 to-rose-600 hover:brightness-110 text-white font-bold text-xs px-5 py-3 rounded-xl shadow-lg shadow-rose-500/25 flex items-center gap-1.5">
+                <i data-lucide="flame" class="w-4 h-4"></i>
+                <span>Burn</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MACOS NOTIFICATION TOAST                                              -->
+  <!-- ===================================================================== -->
+  <div id="toastBox" class="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-50 hidden transition-all duration-300">
+    <div id="toastContent" class="glass-card rounded-2xl p-4 shadow-2xl border-l-4 border-l-quantum flex items-start justify-between gap-3">
+      <div class="text-xs space-y-1">
+        <div id="toastTitle" class="font-bold text-white tracking-tight">Notification</div>
+        <div id="toastMessage" class="text-gray-300 font-mono text-[11px] break-all leading-relaxed">Processing...</div>
+      </div>
+      <button onclick="hideToast()" class="text-gray-400 hover:text-white px-1.5 py-0.5 rounded-lg hover:bg-white/10 transition">✕</button>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- WEB3 & CONTRACT INTEGRATION (UNMODIFIED CORE LOGIC)                   -->
+  <!-- ===================================================================== -->
+  <script>
+    lucide.createIcons();
+
+    const BSC_CHAIN_ID_HEX = '0x38'; // 56 (BSC Mainnet)
+    const BSC_RPC_URL = 'https://bsc-dataseed.binance.org/';
+    const TOKEN_CONTRACT_ADDRESS = '0x1044f6a2299cDB1e48B2BBF259e577BB27eb5f11';
+    const TEST_WALLET_ADDRESS = '0x0C19574C86B284655d657630Cf0930d230E971Ea';
+
+    const CONTRACT_ABI = [{"inputs":[{"internalType":"address","name":"initialOwner","type":"address"},{"internalType":"address","name":"initialDistributionWallet","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"allowance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"}],"name":"ERC20InsufficientAllowance","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"uint256","name":"balance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"}],"name":"ERC20InsufficientBalance","type":"error"},{"inputs":[{"internalType":"address","name":"approver","type":"address"}],"name":"ERC20InvalidApprover","type":"error"},{"inputs":[{"internalType":"address","name":"receiver","type":"address"}],"name":"ERC20InvalidReceiver","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"}],"name":"ERC20InvalidSender","type":"error"},{"inputs":[{"internalType":"address","name":"spender","type":"address"}],"name":"ERC20InvalidSpender","type":"error"},{"inputs":[],"name":"EnforcedPause","type":"error"},{"inputs":[],"name":"ExpectedPause","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"InvalidAdmin","type":"error"},{"inputs":[{"internalType":"uint8","name":"wallet1SharePercent","type":"uint8"},{"internalType":"uint8","name":"wallet2SharePercent","type":"uint8"}],"name":"InvalidDistribution","type":"error"},{"inputs":[{"internalType":"address","name":"wallet","type":"address"}],"name":"InvalidDistributionWallet","type":"error"},{"inputs":[{"internalType":"uint8","name":"percent","type":"uint8"}],"name":"InvalidPercent","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"inputs":[{"internalType":"address","name":"pair","type":"address"}],"name":"PancakeV2PairVerificationFailed","type":"error"},{"inputs":[],"name":"PausePermanentlyDisabled","type":"error"},{"inputs":[],"name":"TradingSecurityPermanentlyDisabled","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"UnauthorizedOperator","type":"error"},{"inputs":[{"internalType":"uint256","name":"chainId","type":"uint256"}],"name":"UnsupportedChain","type":"error"},{"inputs":[],"name":"MAX_SUPPLY","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MAX_TRADING_SECURITY_PERCENT","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"admins","outputs":[{"internalType":"bool","name":"enabled","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"value","type":"uint256"}],"name":"burn","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"buyDistribution","outputs":[{"internalType":"address","name":"wallet1","type":"address"},{"internalType":"address","name":"wallet2","type":"address"},{"internalType":"uint8","name":"wallet1SharePercent","type":"uint8"},{"internalType":"uint8","name":"wallet2SharePercent","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"buyPercent","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pancakeV2Factory","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pancakeV2PairRuntimeCodeHash","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"pair","type":"address"}],"name":"registerPancakeV2Pair","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"sellDistribution","outputs":[{"internalType":"address","name":"wallet1","type":"address"},{"internalType":"address","name":"wallet2","type":"address"},{"internalType":"uint8","name":"wallet1SharePercent","type":"uint8"},{"internalType":"uint8","name":"wallet2SharePercent","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"sellPercent","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"bool","name":"enabled","type":"bool"}],"name":"setAdmin","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"wallet1","type":"address"},{"internalType":"address","name":"wallet2","type":"address"},{"internalType":"uint8","name":"wallet1SharePercent","type":"uint8"},{"internalType":"uint8","name":"wallet2SharePercent","type":"uint8"}],"name":"setBuyDistribution","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint8","name":"newPercent","type":"uint8"}],"name":"setBuyPercent","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"wallet1","type":"address"},{"internalType":"address","name":"wallet2","type":"address"},{"internalType":"uint8","name":"wallet1SharePercent","type":"uint8"},{"internalType":"uint8","name":"wallet2SharePercent","type":"uint8"}],"name":"setSellDistribution","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint8","name":"newPercent","type":"uint8"}],"name":"setSellPercent","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint8","name":"newPercent","type":"uint8"}],"name":"setTradingSecurityPercent","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"bool","name":"enabled","type":"bool"}],"name":"setWhitelist","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"tradingSecurityPercent","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"pair","type":"address"}],"name":"verifiedPancakeV2Pairs","outputs":[{"internalType":"bool","name":"verified","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"whitelisted","outputs":[{"internalType":"bool","name":"enabled","type":"bool"}],"stateMutability":"view","type":"function"}];
+
+    let browserProvider = null;
+    let signer = null;
+    let userAddress = null;
+    let activeContractAddress = null;
+    let tokenDecimals = 18;
+    let isTestWalletSession = false;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile && !window.ethereum) {
+        document.getElementById('gateMobileDeepLink').classList.remove('hidden');
+      }
+
+      if (window.ethereum) {
+        window.ethereum.on('accountsChanged', () => window.location.reload());
+        window.ethereum.on('chainChanged', () => window.location.reload());
+      }
+    });
+
+    function openInMetaMaskMobile() {
+      const currentUrl = window.location.href.replace(/^https?:\/\//, '');
+      window.location.href = `https://metamask.app.link/dapp/${currentUrl}`;
+    }
+
+    function showAuthError(title, desc) {
+      const box = document.getElementById('authErrorBox');
+      document.getElementById('authErrorTitle').innerText = title;
+      document.getElementById('authErrorDesc').innerText = desc;
+      box.classList.remove('hidden');
+    }
+
+    // =====================================================================
+    // OWNER / ADMIN AUTHENTICATION WITH A READ-ONLY TEST WALLET
+    // =====================================================================
+    async function authenticateAndUnlock() {
+      const inputAddr = TOKEN_CONTRACT_ADDRESS;
+      document.getElementById('authErrorBox').classList.add('hidden');
+
+      if (!window.ethereum) {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+          openInMetaMaskMobile();
+          return;
+        }
+        showAuthError('Wallet Not Found', 'Please install MetaMask or open inside MetaMask Mobile browser.');
+        return;
+      }
+
+      const btnText = document.getElementById('gateConnectBtnText');
+      btnText.innerText = 'Verifying Access...';
+
+      try {
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        await ensureBSCMainnet();
+
+        browserProvider = new ethers.BrowserProvider(window.ethereum);
+        signer = await browserProvider.getSigner();
+        userAddress = await signer.getAddress();
+
+        const contract = new ethers.Contract(inputAddr, CONTRACT_ABI, browserProvider);
+
+        const [ownerAddr, isAdmin] = await Promise.all([
+          contract.owner(),
+          contract.admins(userAddress)
+        ]);
+
+        const isOwner = ownerAddr.toLowerCase() === userAddress.toLowerCase();
+        isTestWalletSession = userAddress.toLowerCase() === TEST_WALLET_ADDRESS.toLowerCase() && !isOwner && !isAdmin;
+
+        if (!isOwner && !isAdmin && !isTestWalletSession) {
+          btnText.innerText = 'Connect Wallet & Verify';
+          showAuthError(
+            'Access Denied',
+            `Wallet (${shortAddr(userAddress)}) is not the Contract Owner or an Admin.`
+          );
+          return;
+        }
+
+        activeContractAddress = inputAddr;
+
+        const badge = document.getElementById('roleBadge');
+        if (isTestWalletSession && !isOwner && !isAdmin) {
+          badge.innerText = 'TEST · READ ONLY';
+          badge.className = 'text-[10px] px-2.5 py-1 rounded-lg font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40';
+        } else if (isOwner) {
+          badge.innerText = 'OWNER';
+          badge.className = 'text-[10px] px-2.5 py-1 rounded-lg font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        } else if (isAdmin) {
+          badge.innerText = 'ADMIN';
+          badge.className = 'text-[10px] px-2.5 py-1 rounded-lg font-bold bg-quantum/20 text-quantum-light border border-quantum/40';
+        } else {
+          badge.innerText = 'PENDING';
+          badge.className = 'text-[10px] px-2.5 py-1 rounded-lg font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        }
+
+        document.getElementById('uiConnectedWallet').innerText = shortAddr(userAddress);
+        document.getElementById('headerContractShort').innerText = shortAddr(activeContractAddress);
+
+        await refreshDashboardData();
+
+        document.getElementById('authGateScreen').classList.add('hidden');
+        document.getElementById('dashboardWrapper').classList.remove('hidden');
+
+      } catch (err) {
+        btnText.innerText = 'Connect Wallet & Verify';
+        showAuthError('Connection Error', err.shortMessage || err.message || 'Verification failed on BSC Mainnet.');
+      }
+    }
+
+    function lockSession() {
+      signer = null;
+      userAddress = null;
+      isTestWalletSession = false;
+      document.getElementById('dashboardWrapper').classList.add('hidden');
+      document.getElementById('authGateScreen').classList.remove('hidden');
+      document.getElementById('gateConnectBtnText').innerText = 'Connect Wallet & Verify';
+    }
+
+    async function ensureBSCMainnet() {
+      const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainIdHex !== BSC_CHAIN_ID_HEX) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: BSC_CHAIN_ID_HEX }]
+          });
+        } catch (switchError) {
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: BSC_CHAIN_ID_HEX,
+                chainName: 'BNB Smart Chain Mainnet',
+                nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                rpcUrls: [BSC_RPC_URL],
+                blockExplorerUrls: ['https://bscscan.com']
+              }]
+            });
+          } else {
+            throw switchError;
+          }
+        }
+      }
+    }
+
+    // =====================================================================
+    // READ LIVE CONTRACT DATA
+    // =====================================================================
+    async function refreshDashboardData() {
+      if (!activeContractAddress || !browserProvider) return;
+
+      const icon = document.getElementById('refreshIcon');
+      icon.classList.add('animate-spin');
+
+      try {
+        const contract = new ethers.Contract(activeContractAddress, CONTRACT_ABI, browserProvider);
+
+        const [
+          name, symbol, decimals, totalSupply,
+          buyPercent, sellPercent, buyDist, sellDist,
+          securityPercent, maxSecurityPercent,
+          paused, owner, pendingOwner, factoryAddr, codeHash, userBal
+        ] = await Promise.all([
+          contract.name(),
+          contract.symbol(),
+          contract.decimals(),
+          contract.totalSupply(),
+          contract.buyPercent(),
+          contract.sellPercent(),
+          contract.buyDistribution(),
+          contract.sellDistribution(),
+          contract.tradingSecurityPercent(),
+          contract.MAX_TRADING_SECURITY_PERCENT(),
+          contract.paused(),
+          contract.owner(),
+          contract.pendingOwner(),
+          contract.pancakeV2Factory(),
+          contract.pancakeV2PairRuntimeCodeHash(),
+          contract.balanceOf(userAddress)
+        ]);
+
+        tokenDecimals = Number(decimals);
+
+        document.getElementById('uiTokenName').innerText = name;
+        document.getElementById('uiTokenSymbol').innerText = symbol;
+        document.getElementById('burnCardBalance').innerText = `Bal: ${Number(ethers.formatUnits(userBal, tokenDecimals)).toLocaleString('en-US')} ${symbol}`;
+
+        // Slim Status Strip & Cards
+        document.getElementById('statBuyPercent').innerText = `${buyPercent}%`;
+        document.getElementById('cardBuyPercent').innerText = `${buyPercent}%`;
+        document.getElementById('statBuySplit').innerText = `${buyDist.wallet1SharePercent}% / ${buyDist.wallet2SharePercent}%`;
+
+        document.getElementById('statSellPercent').innerText = `${sellPercent}%`;
+        document.getElementById('cardSellPercent').innerText = `${sellPercent}%`;
+        document.getElementById('statSellSplit').innerText = `${sellDist.wallet1SharePercent}% / ${sellDist.wallet2SharePercent}%`;
+
+        document.getElementById('secCardCurrent').innerText = `${securityPercent}%`;
+        document.getElementById('secCardMax').innerText = `${maxSecurityPercent}%`;
+
+        // Pre-fill Distribution Inputs cleanly
+        document.getElementById('buyW1Addr').value = buyDist.wallet1;
+        document.getElementById('buyW2Addr').value = buyDist.wallet2;
+        document.getElementById('buyW1Share').value = Number(buyDist.wallet1SharePercent);
+        document.getElementById('buyW2Share').value = Number(buyDist.wallet2SharePercent);
+
+        document.getElementById('sellW1Addr').value = sellDist.wallet1;
+        document.getElementById('sellW2Addr').value = sellDist.wallet2;
+        document.getElementById('sellW1Share').value = Number(sellDist.wallet1SharePercent);
+        document.getElementById('sellW2Share').value = Number(sellDist.wallet2SharePercent);
+
+        // Pause State
+        const pauseEl = document.getElementById('statPaused');
+        pauseEl.innerText = paused ? 'Paused' : 'Active';
+        pauseEl.className = paused
+          ? 'text-sm sm:text-lg font-bold text-rose-400 mt-1.5 block truncate'
+          : 'text-sm sm:text-lg font-bold text-emerald-400 mt-1.5 block truncate';
+        document.getElementById('badgePauseState').innerText = paused ? 'Paused' : 'Active';
+
+        // Supply & Owner
+        document.getElementById('statTotalSupply').innerText = Number(ethers.formatUnits(totalSupply, tokenDecimals)).toLocaleString('en-US');
+        document.getElementById('statOwner').innerText = shortAddr(owner);
+        document.getElementById('ownCardOwner').innerText = shortAddr(owner);
+        const hasPending = pendingOwner && pendingOwner !== ethers.ZeroAddress;
+        document.getElementById('ownCardPending').innerText = hasPending ? shortAddr(pendingOwner) : 'None';
+
+        // DEX Info
+        const dexFactoryEl = document.getElementById('dexFactoryAddr');
+        const dexCodeHashEl = document.getElementById('dexCodeHash');
+        if (dexFactoryEl) dexFactoryEl.innerText = factoryAddr;
+        if (dexCodeHashEl) dexCodeHashEl.innerText = codeHash;
+
+      } catch (err) {
+        showToast('Sync Error', 'Could not load contract data.', 'error');
+      } finally {
+        icon.classList.remove('animate-spin');
+      }
+    }
+
+    // =====================================================================
+    // WRITE TRANSACTIONS
+    // =====================================================================
+    async function executeTx(fnName, args = [], successMsg = 'Transaction confirmed!') {
+      if (!signer || !activeContractAddress) return;
+      if (isTestWalletSession) {
+        showToast('Read-only test access', 'The test wallet can inspect the dashboard but cannot submit contract transactions.', 'error');
+        return;
+      }
+
+      try {
+        await ensureBSCMainnet();
+        const contract = new ethers.Contract(activeContractAddress, CONTRACT_ABI, signer);
+        showToast('Confirm in Wallet', `Approving "${fnName}"...`, 'info');
+
+        const tx = await contract[fnName](...args);
+        showToast('Pending...', `Tx: ${shortAddr(tx.hash)}`, 'info');
+
+        await tx.wait();
+        showToast('Success', successMsg, 'success');
+        await refreshDashboardData();
+      } catch (err) {
+        const reason = err.shortMessage || err.reason || err.message || 'Transaction failed.';
+        showToast('Error', reason, 'error');
+      }
+    }
+
+    function handleSetBuyPercent() {
+      const val = Number(document.getElementById('inputBuyPercent').value);
+      executeTx('setBuyPercent', [val], `Buy Tax updated to ${val}%.`);
+    }
+
+    function handleSetSellPercent() {
+      const val = Number(document.getElementById('inputSellPercent').value);
+      executeTx('setSellPercent', [val], `Sell Tax updated to ${val}%.`);
+    }
+
+    function handleSetBuyDistribution() {
+      const w1 = document.getElementById('buyW1Addr').value.trim();
+      const w2 = document.getElementById('buyW2Addr').value.trim();
+      const s1 = Number(document.getElementById('buyW1Share').value);
+      const s2 = Number(document.getElementById('buyW2Share').value);
+      executeTx('setBuyDistribution', [w1, w2, s1, s2], 'Buy distribution updated.');
+    }
+
+    function handleSetSellDistribution() {
+      const w1 = document.getElementById('sellW1Addr').value.trim();
+      const w2 = document.getElementById('sellW2Addr').value.trim();
+      const s1 = Number(document.getElementById('sellW1Share').value);
+      const s2 = Number(document.getElementById('sellW2Share').value);
+      executeTx('setSellDistribution', [w1, w2, s1, s2], 'Sell distribution updated.');
+    }
+
+    function handleSetTradingSecurity() {
+      const val = Number(document.getElementById('inputTradingSecurity').value);
+      executeTx('setTradingSecurityPercent', [val], `Trading Security set to ${val}%.`);
+    }
+
+    function handlePause() {
+      executeTx('pause', [], 'Token transfers paused.');
+    }
+
+    function handleUnpause() {
+      executeTx('unpause', [], 'Token transfers resumed.');
+    }
+
+    async function checkAdminStatus() {
+      const target = document.getElementById('adminTargetAddr').value.trim();
+      if (!ethers.isAddress(target)) return showToast('Invalid Address', 'Enter a valid wallet address.', 'error');
+
+      const contract = new ethers.Contract(activeContractAddress, CONTRACT_ABI, browserProvider);
+      const isAdm = await contract.admins(target);
+      const box = document.getElementById('adminCheckResult');
+      box.classList.remove('hidden');
+      box.innerHTML = isAdm
+        ? `<span class="text-emerald-400 font-semibold">✓ Active Admin</span>`
+        : `<span class="text-rose-400 font-semibold">✕ Not an Admin</span>`;
+    }
+
+    function handleSetAdmin(status) {
+      const target = document.getElementById('adminTargetAddr').value.trim();
+      if (!ethers.isAddress(target)) return showToast('Invalid Address', 'Enter a valid wallet address.', 'error');
+      executeTx('setAdmin', [target, status], `Admin status updated.`);
+    }
+
+    async function checkWhitelistStatus() {
+      const target = document.getElementById('wlTargetAddr').value.trim();
+      if (!ethers.isAddress(target)) return showToast('Invalid Address', 'Enter a valid wallet address.', 'error');
+
+      const contract = new ethers.Contract(activeContractAddress, CONTRACT_ABI, browserProvider);
+      const isWl = await contract.whitelisted(target);
+      const box = document.getElementById('wlCheckResult');
+      box.classList.remove('hidden');
+      box.innerHTML = isWl
+        ? `<span class="text-emerald-400 font-semibold">✓ Whitelisted</span>`
+        : `<span class="text-rose-400 font-semibold">✕ Not Whitelisted</span>`;
+    }
+
+    function handleSetWhitelist(status) {
+      const target = document.getElementById('wlTargetAddr').value.trim();
+      if (!ethers.isAddress(target)) return showToast('Invalid Address', 'Enter a valid wallet address.', 'error');
+      executeTx('setWhitelist', [target, status], `Whitelist updated.`);
+    }
+
+    async function checkPairStatus() {
+      const pair = document.getElementById('pairAddressInput').value.trim();
+      if (!ethers.isAddress(pair)) return showToast('Invalid Address', 'Enter a valid pair address.', 'error');
+
+      const contract = new ethers.Contract(activeContractAddress, CONTRACT_ABI, browserProvider);
+      const isVerified = await contract.verifiedPancakeV2Pairs(pair);
+      const box = document.getElementById('pairCheckResult');
+      box.classList.remove('hidden');
+      box.innerHTML = isVerified
+        ? `<span class="text-emerald-400 font-semibold">✓ Verified Pair</span>`
+        : `<span class="text-rose-400 font-semibold">✕ Unverified Pair</span>`;
+    }
+
+    function handleRegisterPair() {
+      const pair = document.getElementById('pairAddressInput').value.trim();
+      if (!ethers.isAddress(pair)) return showToast('Invalid Address', 'Enter a valid pair address.', 'error');
+      executeTx('registerPancakeV2Pair', [pair], 'Pair registered.');
+    }
+
+    function handleTransferOwnership() {
+      const newOwn = document.getElementById('newOwnerInput').value.trim();
+      if (!ethers.isAddress(newOwn)) return showToast('Invalid Address', 'Enter a valid new owner address.', 'error');
+      executeTx('transferOwnership', [newOwn], 'Ownership transfer started.');
+    }
+
+    function handleAcceptOwnership() {
+      executeTx('acceptOwnership', [], 'Ownership accepted!');
+    }
+
+    function handleBurn() {
+      const rawAmount = document.getElementById('burnAmountInput').value.trim();
+      if (!rawAmount || Number(rawAmount) <= 0) return showToast('Invalid Amount', 'Enter a valid amount.', 'error');
+      const parsed = ethers.parseUnits(rawAmount, tokenDecimals);
+      executeTx('burn', [parsed], `${rawAmount} tokens burned.`);
+    }
+
+    const GECKO_API_ROOT = 'https://api.geckoterminal.com/api/v2';
+    const TRADE_TOKEN_ADDRESS = TOKEN_CONTRACT_ADDRESS;
+    let tradeInterval = '1d';
+    let tradesLoaded = false;
+    let liquidityLoaded = false;
+    let liquidityRequestId = 0;
+    let tradeRequestId = 0;
+    let tradePoolAddress = '';
+    let tradePoolTokenSide = 'base';
+
+    function geckoUrl(path, params) {
+      return `${GECKO_API_ROOT}/${path}?${new URLSearchParams(params).toString()}`;
+    }
+
+    async function fetchGecko(path, params = {}) {
+      const response = await fetch(geckoUrl(path, params), {
+        headers: { Accept: 'application/json;version=20230302' }
+      });
+      if (!response.ok) throw new Error(`GeckoTerminal API returned ${response.status}`);
+      const payload = await response.json();
+      if (payload.errors?.length) throw new Error(payload.errors[0].detail || 'GeckoTerminal API request failed');
+      return payload;
+    }
+
+    function formatUsd(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number === 0) return '$0.00';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: number < 1 ? 5 : 7 }).format(number);
+    }
+
+    function formatAmount(value) {
+      const number = Number(value);
+      return Number.isFinite(number) ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(number) : '—';
+    }
+
+    function tradeTimestamp(value) {
+      if (value === null || value === undefined || value === '') return null;
+      const numeric = Number(value);
+      const date = Number.isFinite(numeric)
+        ? new Date(numeric < 100000000000 ? numeric * 1000 : numeric)
+        : new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function drawTradeChart(candles) {
+      const svg = document.getElementById('tradeChart');
+      const loading = document.getElementById('tradeChartLoading');
+      const valid = (candles || []).filter(point => Array.isArray(point) && Number.isFinite(Number(point[3])) && Number(point[3]) > 0);
+      loading.classList.add('hidden');
+      if (!valid.length) {
+        svg.innerHTML = '';
+        loading.textContent = 'No chart data available for this period.';
+        loading.classList.remove('hidden');
+        return;
+      }
+      const prices = valid.map(point => Number(point[3]));
+      const min = Math.min(...prices), max = Math.max(...prices);
+      const spread = max - min || max * 0.02 || 1;
+      const low = min - spread * 0.12, high = max + spread * 0.12;
+      const x = index => 24 + (index / Math.max(valid.length - 1, 1)) * 952;
+      const y = price => 18 + ((high - price) / (high - low)) * 262;
+      const points = prices.map((price, index) => `${x(index).toFixed(1)},${y(price).toFixed(1)}`).join(' ');
+      const last = prices[prices.length - 1], first = prices[0];
+      const color = last >= first ? '#34d399' : '#fb7185';
+      const yLines = [0, 1, 2, 3].map(i => {
+        const yy = 22 + i * 86, value = high - i * (high - low) / 3;
+        return `<line x1="20" y1="${yy}" x2="980" y2="${yy}" stroke="rgba(255,255,255,.055)" stroke-dasharray="3 7"/><text x="24" y="${yy - 5}" fill="#697386" font-size="10">${formatUsd(value)}</text>`;
+      }).join('');
+      svg.innerHTML = `<defs><linearGradient id="tradeArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".22"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${yLines}<polygon points="${x(0)},${y(prices[0])} ${points} ${x(valid.length - 1)},296 ${x(0)},296" fill="url(#tradeArea)"/><polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${x(valid.length - 1)}" cy="${y(last)}" r="4" fill="${color}"/>`;
+      document.getElementById('tradePrice').textContent = formatUsd(last);
+      const change = first ? ((last - first) / first) * 100 : 0;
+      const changeEl = document.getElementById('tradeChange');
+      changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}% · selected period`;
+      changeEl.className = `text-xs mt-1 ${change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+      document.getElementById('chartStartLabel').textContent = new Date(Number(valid[0][5]) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      document.getElementById('chartEndLabel').textContent = new Date(Number(valid[valid.length - 1][5]) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function renderTradeRows(swaps) {
+      const body = document.getElementById('tradeRows');
+      const entries = swaps || [];
+      document.getElementById('tradeCount').textContent = `${entries.length} trades`;
+      if (!entries.length) {
+        body.innerHTML = '<tr><td colspan="6" class="px-5 py-8 text-center text-gray-500">No recent trades found for this token.</td></tr>';
+        return;
+      }
+      body.innerHTML = entries.map(item => {
+        const isBuy = String(item.tp || '').toLowerCase() === 'buy';
+        const tokenAmount = item.amount;
+        const tokenPrice = item.price;
+        const tx = item.tx || '', maker = item.maker || '', date = tradeTimestamp(item.ts);
+        const txUrl = tx ? `https://bscscan.com/tx/${encodeURIComponent(tx)}` : 'https://bscscan.com';
+        const time = date ? date.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : '—';
+        return `<tr class="border-t border-white/[0.045] hover:bg-white/[0.025] transition-colors"><td class="px-4 sm:px-5 py-3"><div class="font-bold ${isBuy ? 'text-emerald-400' : 'text-rose-400'}">${isBuy ? 'Buy' : 'Sell'}</div><div class="text-[9px] text-gray-500 mt-1">${time}</div></td><td class="px-3 py-3 font-mono text-gray-200">${formatUsd(tokenPrice)}</td><td class="px-3 py-3 font-mono text-gray-300">${formatAmount(tokenAmount)}</td><td class="px-3 py-3 font-mono text-gray-200">${formatUsd(item.volume)}</td><td class="px-3 py-3 font-mono text-gray-400">${maker ? `<a class="hover:text-quantum-light" href="https://bscscan.com/address/${encodeURIComponent(maker)}" target="_blank" rel="noopener noreferrer">${maker.slice(0, 6)}…${maker.slice(-4)}</a>` : '—'}</td><td class="px-4 py-3 text-right"><a class="inline-flex items-center gap-1 text-quantum-light hover:text-white" href="${txUrl}" target="_blank" rel="noopener noreferrer">${tx ? `${tx.slice(0, 6)}…${tx.slice(-4)}` : 'View'} <i data-lucide="external-link" class="w-3 h-3"></i></a></td></tr>`;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    async function loadTradesData(force = false) {
+      if (tradesLoaded && !force) return;
+      const requestId = ++tradeRequestId;
+      const status = document.getElementById('tradesStatus');
+      const loading = document.getElementById('tradeChartLoading');
+      status.textContent = 'Updating GeckoTerminal data…';
+      loading.textContent = 'Loading chart data…';
+      loading.classList.remove('hidden');
+      let results;
+      try {
+        if (!tradePoolAddress) {
+          const poolPayload = await fetchGecko(`networks/bsc/tokens/${TRADE_TOKEN_ADDRESS}/pools`, { page: 1 });
+          const tokenKey = TRADE_TOKEN_ADDRESS.toLowerCase();
+          const matchingPools = (poolPayload.data || [])
+            .filter(pool => {
+              const base = String(pool.relationships?.base_token?.data?.id || '').toLowerCase();
+              const quote = String(pool.relationships?.quote_token?.data?.id || '').toLowerCase();
+              return base.endsWith(`_${tokenKey}`) || quote.endsWith(`_${tokenKey}`);
+            })
+            .sort((a, b) => Number(b.attributes?.reserve_in_usd || 0) - Number(a.attributes?.reserve_in_usd || 0));
+          const selectedPool = matchingPools[0];
+          tradePoolAddress = selectedPool?.attributes?.address || '';
+          const selectedBase = String(selectedPool?.relationships?.base_token?.data?.id || '').toLowerCase();
+          tradePoolTokenSide = selectedBase.endsWith(`_${tokenKey}`) ? 'base' : 'quote';
+          if (!tradePoolAddress) throw new Error('No BNB Chain liquidity pool was found for QTM.');
+        }
+
+        const candleInterval = tradeInterval === '1m' ? 'day' : tradeInterval === '1w' ? 'hour' : tradeInterval === '1h' ? 'minute' : 'hour';
+        const aggregate = tradeInterval === '1m' ? 1 : tradeInterval === '1w' ? 4 : 1;
+        const limit = tradeInterval === '1m' ? 30 : tradeInterval === '1w' ? 42 : tradeInterval === '1h' ? 60 : 24;
+        results = await Promise.allSettled([
+          fetchGecko(`networks/bsc/pools/${tradePoolAddress}/ohlcv/${candleInterval}`, { aggregate, limit, currency: 'usd', token: tradePoolTokenSide }),
+          fetchGecko(`networks/bsc/pools/${tradePoolAddress}/trades`, { page: 1 })
+        ]);
+      } catch (error) {
+        if (requestId !== tradeRequestId) return;
+        status.textContent = 'Market data unavailable';
+        loading.textContent = error.message || 'Market data could not be loaded. Please refresh.';
+        loading.classList.remove('hidden');
+        document.getElementById('tradeRows').innerHTML = `<tr><td colspan="6" class="px-5 py-8 text-center text-gray-500">${error.message || 'Trade history is temporarily unavailable.'}</td></tr>`;
+        console.error('GeckoTerminal market data error:', error);
+        return;
+      }
+      if (requestId !== tradeRequestId) return;
+      const candleRows = results[0].status === 'fulfilled' ? (results[0].value.data?.attributes?.ohlcv_list || []) : [];
+      const candles = candleRows
+        .map(([timestamp, open, high, low, close, volume]) => [open, high, low, close, volume, timestamp, 0])
+        .sort((a, b) => a[5] - b[5]);
+      if (candles.length) drawTradeChart(candles);
+      else {
+        loading.textContent = 'Chart data is temporarily unavailable.';
+        loading.classList.remove('hidden');
+        console.error('GeckoTerminal chart error:', results[0].reason);
+      }
+      const tradeRows = results[1].status === 'fulfilled' ? (results[1].value.data || []) : [];
+      const trades = tradeRows.map(row => {
+        const item = row.attributes || {};
+        const tokenIsOutput = String(item.to_token_address || '').toLowerCase() === TRADE_TOKEN_ADDRESS.toLowerCase();
+        return {
+          tp: item.kind,
+          amount: tokenIsOutput ? item.to_token_amount : item.from_token_amount,
+          price: tokenIsOutput ? item.price_to_in_usd : item.price_from_in_usd,
+          volume: item.volume_in_usd,
+          maker: item.tx_from_address,
+          tx: item.tx_hash,
+          ts: item.block_timestamp
+        };
+      });
+      if (results[1].status === 'fulfilled') renderTradeRows(trades);
+      else { document.getElementById('tradeRows').innerHTML = '<tr><td colspan="6" class="px-5 py-8 text-center text-gray-500">Trade history is temporarily unavailable. Please refresh.</td></tr>'; console.error('GeckoTerminal trades error:', results[1].reason); }
+      tradesLoaded = results.some(result => result.status === 'fulfilled');
+      status.textContent = tradesLoaded ? 'GeckoTerminal · just updated' : 'Market data unavailable';
+    }
+
+    function setTradeInterval(interval, button) {
+      tradeInterval = interval;
+      document.querySelectorAll('.trade-range').forEach(item => item.classList.remove('trade-range-active'));
+      button.classList.add('trade-range-active');
+      loadTradesData(true);
+    }
+
+    function switchMarketHistory(view) {
+      const showTrades = view === 'trades';
+      document.getElementById('marketTradesPanel').classList.toggle('hidden', !showTrades);
+      document.getElementById('marketLiquidityPanel').classList.toggle('hidden', showTrades);
+      document.getElementById('tradeCount').classList.toggle('hidden', !showTrades);
+      document.getElementById('liquidityCount').classList.toggle('hidden', showTrades);
+      document.getElementById('liquidityRefreshButton').classList.toggle('hidden', showTrades);
+      document.getElementById('historySubtitle').textContent = showTrades
+        ? 'Recent on-chain swaps · GeckoTerminal'
+        : 'Added and removed liquidity · BNB Chain';
+      document.getElementById('marketTabTrades').className = `market-history-tab rounded-lg px-3 py-2 text-[11px] font-semibold ${showTrades ? 'bg-quantum/20 text-quantum-light' : 'text-gray-400 hover:text-white'}`;
+      document.getElementById('marketTabLiquidity').className = `market-history-tab rounded-lg px-3 py-2 text-[11px] font-semibold ${showTrades ? 'text-gray-400 hover:text-white' : 'bg-quantum/20 text-quantum-light'}`;
+      document.getElementById('marketTabTrades').setAttribute('aria-selected', String(showTrades));
+      document.getElementById('marketTabLiquidity').setAttribute('aria-selected', String(!showTrades));
+      if (!showTrades) loadLiquidityData();
+    }
+
+    async function loadLiquidityData(force = false) {
+      if (liquidityLoaded && !force) return;
+      const requestId = ++liquidityRequestId;
+      const body = document.getElementById('liquidityRows');
+      const count = document.getElementById('liquidityCount');
+      count.textContent = 'Loading…';
+      body.innerHTML = '<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">Loading recent liquidity events…</td></tr>';
+      try {
+        if (!tradePoolAddress) {
+          const poolPayload = await fetchGecko(`networks/bsc/tokens/${TRADE_TOKEN_ADDRESS}/pools`, { page: 1 });
+          const tokenKey = TRADE_TOKEN_ADDRESS.toLowerCase();
+          const pools = (poolPayload.data || []).filter(pool => {
+            const base = String(pool.relationships?.base_token?.data?.id || '').toLowerCase();
+            const quote = String(pool.relationships?.quote_token?.data?.id || '').toLowerCase();
+            return base.endsWith(`_${tokenKey}`) || quote.endsWith(`_${tokenKey}`);
+          }).sort((a, b) => Number(b.attributes?.reserve_in_usd || 0) - Number(a.attributes?.reserve_in_usd || 0));
+          tradePoolAddress = pools[0]?.attributes?.address || '';
+          if (!tradePoolAddress) throw new Error('No BNB Chain liquidity pool was found for QTM.');
+        }
+
+        const provider = new ethers.JsonRpcProvider(BSC_RPC_URL);
+        const pair = new ethers.Contract(tradePoolAddress, [
+          'function token0() view returns (address)',
+          'function token1() view returns (address)'
+        ], provider);
+        const [token0, token1, latestBlock] = await Promise.all([pair.token0(), pair.token1(), provider.getBlockNumber()]);
+        const tokenAbi = ['function decimals() view returns (uint8)', 'function symbol() view returns (string)'];
+        const [decimals0, decimals1, symbol0, symbol1] = await Promise.all([
+          new ethers.Contract(token0, tokenAbi, provider).decimals(),
+          new ethers.Contract(token1, tokenAbi, provider).decimals(),
+          new ethers.Contract(token0, tokenAbi, provider).symbol(),
+          new ethers.Contract(token1, tokenAbi, provider).symbol()
+        ]);
+        const qtmIs0 = token0.toLowerCase() === TRADE_TOKEN_ADDRESS.toLowerCase();
+        if (!qtmIs0 && token1.toLowerCase() !== TRADE_TOKEN_ADDRESS.toLowerCase()) throw new Error('The selected pool does not contain the QTM token.');
+        const qtmDecimals = Number(qtmIs0 ? decimals0 : decimals1);
+        const pairDecimals = Number(qtmIs0 ? decimals1 : decimals0);
+        const pairSymbol = qtmIs0 ? symbol1 : symbol0;
+        const iface = new ethers.Interface([
+          'event Mint(address indexed sender, uint256 amount0, uint256 amount1)',
+          'event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to)'
+        ]);
+        const mintTopic = ethers.id('Mint(address,uint256,uint256)');
+        const burnTopic = ethers.id('Burn(address,uint256,uint256,address)');
+        const fromBlock = Math.max(0, latestBlock - 10000);
+        const ranges = [];
+        for (let start = fromBlock; start <= latestBlock; start += 2000) {
+          ranges.push({ fromBlock: start, toBlock: Math.min(start + 1999, latestBlock), address: tradePoolAddress, topics: [[mintTopic, burnTopic]] });
+        }
+        const logs = (await Promise.all(ranges.map(filter => provider.getLogs(filter)))).flat()
+          .sort((a, b) => Number(b.blockNumber - a.blockNumber)).slice(0, 40);
+        if (requestId !== liquidityRequestId) return;
+        if (!logs.length) {
+          body.innerHTML = '<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">No liquidity additions or removals found in the recent block range.</td></tr>';
+          count.textContent = '0 events';
+          liquidityLoaded = true;
+          return;
+        }
+        body.innerHTML = logs.map(log => {
+          const parsed = iface.parseLog(log);
+          const isAdd = parsed.name === 'Mint';
+          const amount0 = parsed.args.amount0;
+          const amount1 = parsed.args.amount1;
+          const qtmAmount = ethers.formatUnits(qtmIs0 ? amount0 : amount1, qtmDecimals);
+          const pairAmount = ethers.formatUnits(qtmIs0 ? amount1 : amount0, pairDecimals);
+          const tx = encodeURIComponent(log.transactionHash);
+          return `<tr class="border-t border-white/[0.045] hover:bg-white/[0.025] transition-colors"><td class="px-4 sm:px-5 py-3"><div class="font-bold ${isAdd ? 'text-emerald-400' : 'text-rose-400'}">${isAdd ? 'Added' : 'Removed'}</div><div class="text-[9px] text-gray-500 mt-1">Block ${log.blockNumber.toLocaleString('en-US')}</div></td><td class="px-3 py-3 font-mono text-gray-200">${formatAmount(qtmAmount)} QTM</td><td class="px-3 py-3 font-mono text-gray-300">${formatAmount(pairAmount)} ${pairSymbol}</td><td class="px-4 py-3 text-right"><a class="inline-flex items-center gap-1 text-quantum-light hover:text-white" href="https://bscscan.com/tx/${tx}" target="_blank" rel="noopener noreferrer">${log.transactionHash.slice(0, 6)}…${log.transactionHash.slice(-4)} <i data-lucide="external-link" class="w-3 h-3"></i></a></td></tr>`;
+        }).join('');
+        count.textContent = `${logs.length} events`;
+        liquidityLoaded = true;
+        lucide.createIcons();
+      } catch (error) {
+        if (requestId !== liquidityRequestId) return;
+        body.innerHTML = `<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">${error.message || 'Liquidity history is temporarily unavailable.'}</td></tr>`;
+        count.textContent = 'Unavailable';
+        console.error('QTM liquidity history error:', error);
+      }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('tab-active');
+        btn.classList.add('text-gray-400');
+      });
+      const activeBtn = document.getElementById(`tabBtn-${tabId}`);
+      activeBtn.classList.add('tab-active');
+      activeBtn.classList.remove('text-gray-400');
+      if (tabId === 'dex') loadTradesData();
+    }
+
+    function shortAddr(addr) {
+      if (!addr || addr.length < 10) return addr;
+      return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+    }
+
+    function showToast(title, msg, type = 'info') {
+      const box = document.getElementById('toastBox');
+      const content = document.getElementById('toastContent');
+      document.getElementById('toastTitle').innerText = title;
+      document.getElementById('toastMessage').innerText = msg;
+
+      content.className = 'glass-card rounded-2xl p-4 shadow-2xl flex items-start justify-between gap-3 border-l-4 ';
+      if (type === 'error') content.classList.add('border-l-rose-500');
+      else if (type === 'success') content.classList.add('border-l-emerald-500');
+      else content.classList.add('border-l-quantum');
+
+      box.classList.remove('hidden');
+      setTimeout(hideToast, 5000);
+    }
+
+    function hideToast() {
+      document.getElementById('toastBox').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
