@@ -217,6 +217,45 @@
       input[type="text"], input[type="number"] {
         font-size: 16px !important;
       }
+
+      #liquidityTable {
+        display: block;
+        min-width: 0 !important;
+        table-layout: fixed;
+      }
+      #liquidityTable thead { display: none; }
+      #liquidityTable tbody {
+        display: grid;
+        gap: 0.5rem;
+        padding: 0.75rem;
+      }
+      #liquidityTable tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.25rem 0.75rem;
+        padding: 0.75rem;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 0.75rem;
+        background: rgba(255,255,255,.02);
+      }
+      #liquidityTable tbody td {
+        display: block;
+        min-width: 0;
+        padding: 0 !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #liquidityTable tbody td:first-child { grid-column: 1; grid-row: 1; }
+      #liquidityTable tbody td:nth-child(2) { grid-column: 1; grid-row: 2; }
+      #liquidityTable tbody td:nth-child(3) { grid-column: 1; grid-row: 3; }
+      #liquidityTable tbody td:nth-child(4) { grid-column: 2; grid-row: 1 / span 3; align-self: center; text-align: right; }
+      #liquidityTable tbody td[colspan="4"] {
+        grid-column: 1 / -1;
+        padding: 0.75rem !important;
+        white-space: normal;
+        text-align: center;
+      }
     }
 
     .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -776,8 +815,13 @@
           <div class="px-4 sm:px-5 py-3 border-t border-white/[0.06] text-[9px] text-gray-600">Live token data provided by GeckoTerminal API. Scroll horizontally to view all columns on small screens.</div>
           </div>
           <div id="marketLiquidityPanel" class="hidden" role="tabpanel">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 sm:p-4 border-b border-white/[0.06]">
+              <div class="min-w-0 rounded-xl bg-white/[0.025] border border-white/[0.07] px-3 py-2.5"><p class="text-[9px] uppercase tracking-wider text-gray-500 truncate">Pool Liquidity</p><p id="liquidityTotalValue" class="text-sm sm:text-base font-bold font-mono text-white mt-1 truncate">--</p></div>
+              <div class="min-w-0 rounded-xl bg-white/[0.025] border border-white/[0.07] px-3 py-2.5"><p class="text-[9px] uppercase tracking-wider text-gray-500 truncate">QTM Reserve</p><p id="liquidityQtmReserve" class="text-sm sm:text-base font-bold font-mono text-white mt-1 truncate">--</p></div>
+              <div class="min-w-0 rounded-xl bg-white/[0.025] border border-white/[0.07] px-3 py-2.5"><p id="liquidityPairTitle" class="text-[9px] uppercase tracking-wider text-gray-500 truncate">Pair Reserve</p><p id="liquidityPairReserve" class="text-sm sm:text-base font-bold font-mono text-white mt-1 truncate">--</p></div>
+            </div>
             <div class="overflow-x-auto">
-              <table class="w-full min-w-[560px] text-left text-[11px]">
+              <table id="liquidityTable" class="w-full min-w-[560px] text-left text-[11px]">
                 <thead class="bg-white/[0.02] text-[9px] uppercase tracking-wider text-gray-500"><tr><th class="px-4 sm:px-5 py-3 font-semibold">Type / Time</th><th class="px-3 py-3 font-semibold">QTM amount</th><th class="px-3 py-3 font-semibold">Paired asset amount</th><th class="px-4 py-3 font-semibold text-right">Transaction</th></tr></thead>
                 <tbody id="liquidityRows"><tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">Open Liquidity to load recent pool activity.</td></tr></tbody>
               </table>
@@ -1366,6 +1410,24 @@
       return tradePoolAddress;
     }
 
+    async function getLiquidityLogs(provider, filter) {
+      try {
+        return await provider.getLogs(filter);
+      } catch (error) {
+        const rpcError = error.error || error.info?.error || error.cause?.error || {};
+        const message = [error.shortMessage, error.message, rpcError.message].filter(Boolean).join(' ');
+        const isLimitError = Number(rpcError.code || error.code) === -32005 || /limit exceeded|too many results|response size/i.test(message);
+        const fromBlock = Number(filter.fromBlock);
+        const toBlock = Number(filter.toBlock);
+        if (!isLimitError || fromBlock >= toBlock) throw error;
+
+        const middleBlock = Math.floor((fromBlock + toBlock) / 2);
+        const firstHalf = await getLiquidityLogs(provider, { ...filter, fromBlock, toBlock: middleBlock });
+        const secondHalf = await getLiquidityLogs(provider, { ...filter, fromBlock: middleBlock + 1, toBlock });
+        return firstHalf.concat(secondHalf);
+      }
+    }
+
     function drawTradeChart(candles) {
       const svg = document.getElementById('tradeChart');
       const loading = document.getElementById('tradeChartLoading');
@@ -1516,9 +1578,10 @@
         await ensureQtmTradePool(provider);
         const pair = new ethers.Contract(tradePoolAddress, [
           'function token0() view returns (address)',
-          'function token1() view returns (address)'
+          'function token1() view returns (address)',
+          'function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)'
         ], provider);
-        const [token0, token1, latestBlock] = await Promise.all([pair.token0(), pair.token1(), provider.getBlockNumber()]);
+        const [token0, token1, reserves, latestBlock] = await Promise.all([pair.token0(), pair.token1(), pair.getReserves(), provider.getBlockNumber()]);
         const tokenAbi = ['function decimals() view returns (uint8)', 'function symbol() view returns (string)'];
         const [decimals0, decimals1, symbol0, symbol1] = await Promise.all([
           new ethers.Contract(token0, tokenAbi, provider).decimals(),
@@ -1531,6 +1594,18 @@
         const qtmDecimals = Number(qtmIs0 ? decimals0 : decimals1);
         const pairDecimals = Number(qtmIs0 ? decimals1 : decimals0);
         const pairSymbol = qtmIs0 ? symbol1 : symbol0;
+        const qtmReserve = ethers.formatUnits(qtmIs0 ? reserves.reserve0 : reserves.reserve1, qtmDecimals);
+        const pairReserve = ethers.formatUnits(qtmIs0 ? reserves.reserve1 : reserves.reserve0, pairDecimals);
+        document.getElementById('liquidityQtmReserve').textContent = `${formatLiquidityAmount(qtmReserve)} QTM`;
+        document.getElementById('liquidityPairReserve').textContent = `${formatLiquidityAmount(pairReserve)} ${pairSymbol}`;
+        document.getElementById('liquidityPairTitle').textContent = `${pairSymbol} Reserve`;
+        try {
+          const poolPayload = await fetchGecko(`networks/bsc/pools/${tradePoolAddress}`);
+          const totalLiquidityUsd = Number(poolPayload.data?.attributes?.reserve_in_usd);
+          document.getElementById('liquidityTotalValue').textContent = Number.isFinite(totalLiquidityUsd) && totalLiquidityUsd > 0 ? formatUsd(totalLiquidityUsd) : '—';
+        } catch {
+          document.getElementById('liquidityTotalValue').textContent = '—';
+        }
         const iface = new ethers.Interface([
           'event Mint(address indexed sender, uint256 amount0, uint256 amount1)',
           'event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to)'
@@ -1539,11 +1614,11 @@
         const burnTopic = ethers.id('Burn(address,uint256,uint256,address)');
         const fromBlock = Math.max(0, latestBlock - 10000);
         const ranges = [];
-        for (let start = fromBlock; start <= latestBlock; start += 2000) {
-          ranges.push({ fromBlock: start, toBlock: Math.min(start + 1999, latestBlock), address: tradePoolAddress, topics: [[mintTopic, burnTopic]] });
+        for (let start = fromBlock; start <= latestBlock; start += 1000) {
+          ranges.push({ fromBlock: start, toBlock: Math.min(start + 999, latestBlock), address: tradePoolAddress, topics: [[mintTopic, burnTopic]] });
         }
         const logs = [];
-        for (const filter of ranges) logs.push(...await provider.getLogs(filter));
+        for (const filter of ranges) logs.push(...await getLiquidityLogs(provider, filter));
         logs.sort((a, b) => Number(b.blockNumber - a.blockNumber));
         logs.splice(30);
         if (requestId !== liquidityRequestId) return;
