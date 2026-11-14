@@ -776,6 +776,11 @@
           <div class="px-4 sm:px-5 py-3 border-t border-white/[0.06] text-[9px] text-gray-600">Live token data provided by GeckoTerminal API. Scroll horizontally to view all columns on small screens.</div>
           </div>
           <div id="marketLiquidityPanel" class="hidden" role="tabpanel">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 sm:p-5 border-b border-white/[0.06]">
+              <div class="rounded-xl bg-white/[0.025] border border-white/[0.07] p-3.5"><p class="text-[9px] uppercase tracking-wider text-gray-500">Total Pool Liquidity</p><p id="liquidityTotalValue" class="text-lg font-bold font-mono text-white mt-1">--</p><p id="liquidityPoolLabel" class="text-[9px] text-gray-500 mt-1">QTM pool</p></div>
+              <div class="rounded-xl bg-white/[0.025] border border-white/[0.07] p-3.5"><p class="text-[9px] uppercase tracking-wider text-gray-500">QTM in Pool</p><p id="liquidityQtmReserve" class="text-lg font-bold font-mono text-white mt-1">--</p><p class="text-[9px] text-gray-500 mt-1">Current on-chain reserve</p></div>
+              <div class="rounded-xl bg-white/[0.025] border border-white/[0.07] p-3.5"><p id="liquidityPairTitle" class="text-[9px] uppercase tracking-wider text-gray-500">Pair Reserve</p><p id="liquidityPairReserve" class="text-lg font-bold font-mono text-white mt-1">--</p><p class="text-[9px] text-gray-500 mt-1">Current on-chain reserve</p></div>
+            </div>
             <div class="overflow-x-auto">
               <table class="w-full min-w-[560px] text-left text-[11px]">
                 <thead class="bg-white/[0.02] text-[9px] uppercase tracking-wider text-gray-500"><tr><th class="px-4 sm:px-5 py-3 font-semibold">Event / Block</th><th class="px-3 py-3 font-semibold">QTM amount</th><th class="px-3 py-3 font-semibold">Pair token amount</th><th class="px-4 py-3 font-semibold text-right">Transaction</th></tr></thead>
@@ -1268,6 +1273,13 @@
 
     const GECKO_API_ROOT = 'https://api.geckoterminal.com/api/v2';
     const TRADE_TOKEN_ADDRESS = TOKEN_CONTRACT_ADDRESS;
+    const PANCAKE_V2_FACTORY_ADDRESS = '0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73';
+    const QTM_QUOTE_TOKENS = [
+      { address: '0x55d398326f99059fF775485246999027B3197955', symbol: 'USDT' },
+      { address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', symbol: 'WBNB' },
+      { address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', symbol: 'USDC' },
+      { address: '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56', symbol: 'BUSD' }
+    ];
     let tradeInterval = '1d';
     let tradesLoaded = false;
     let liquidityLoaded = false;
@@ -1308,6 +1320,45 @@
         ? new Date(numeric < 100000000000 ? numeric * 1000 : numeric)
         : new Date(value);
       return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    async function ensureQtmTradePool(provider) {
+      if (tradePoolAddress) return tradePoolAddress;
+      try {
+        const poolPayload = await fetchGecko(`networks/bsc/tokens/${TRADE_TOKEN_ADDRESS}/pools`, { page: 1 });
+        const tokenKey = TRADE_TOKEN_ADDRESS.toLowerCase();
+        const matchingPools = (poolPayload.data || [])
+          .filter(pool => {
+            const base = String(pool.relationships?.base_token?.data?.id || '').toLowerCase();
+            const quote = String(pool.relationships?.quote_token?.data?.id || '').toLowerCase();
+            return base.endsWith(`_${tokenKey}`) || quote.endsWith(`_${tokenKey}`);
+          })
+          .sort((a, b) => Number(b.attributes?.reserve_in_usd || 0) - Number(a.attributes?.reserve_in_usd || 0));
+        const selectedPool = matchingPools[0];
+        tradePoolAddress = selectedPool?.attributes?.address || '';
+        if (tradePoolAddress) {
+          const selectedBase = String(selectedPool.relationships?.base_token?.data?.id || '').toLowerCase();
+          tradePoolTokenSide = selectedBase.endsWith(`_${tokenKey}`) ? 'base' : 'quote';
+        }
+      } catch (error) {
+        console.warn('QTM token pool index is unavailable; resolving the pair from PancakeSwap V2.', error);
+      }
+
+      if (!tradePoolAddress) {
+        const factory = new ethers.Contract(PANCAKE_V2_FACTORY_ADDRESS, [
+          'function getPair(address tokenA, address tokenB) view returns (address)'
+        ], provider);
+        const pairAddresses = await Promise.all(QTM_QUOTE_TOKENS.map(quote => factory.getPair(TRADE_TOKEN_ADDRESS, quote.address)));
+        const pairIndex = pairAddresses.findIndex(address => address !== ethers.ZeroAddress);
+        if (pairIndex >= 0) {
+          tradePoolAddress = pairAddresses[pairIndex];
+          const pair = new ethers.Contract(tradePoolAddress, ['function token0() view returns (address)'], provider);
+          tradePoolTokenSide = (await pair.token0()).toLowerCase() === TRADE_TOKEN_ADDRESS.toLowerCase() ? 'base' : 'quote';
+        }
+      }
+
+      if (!tradePoolAddress) throw new Error('No PancakeSwap liquidity pool was found for QTM.');
+      return tradePoolAddress;
     }
 
     function drawTradeChart(candles) {
@@ -1374,22 +1425,8 @@
       loading.classList.remove('hidden');
       let results;
       try {
-        if (!tradePoolAddress) {
-          const poolPayload = await fetchGecko(`networks/bsc/tokens/${TRADE_TOKEN_ADDRESS}/pools`, { page: 1 });
-          const tokenKey = TRADE_TOKEN_ADDRESS.toLowerCase();
-          const matchingPools = (poolPayload.data || [])
-            .filter(pool => {
-              const base = String(pool.relationships?.base_token?.data?.id || '').toLowerCase();
-              const quote = String(pool.relationships?.quote_token?.data?.id || '').toLowerCase();
-              return base.endsWith(`_${tokenKey}`) || quote.endsWith(`_${tokenKey}`);
-            })
-            .sort((a, b) => Number(b.attributes?.reserve_in_usd || 0) - Number(a.attributes?.reserve_in_usd || 0));
-          const selectedPool = matchingPools[0];
-          tradePoolAddress = selectedPool?.attributes?.address || '';
-          const selectedBase = String(selectedPool?.relationships?.base_token?.data?.id || '').toLowerCase();
-          tradePoolTokenSide = selectedBase.endsWith(`_${tokenKey}`) ? 'base' : 'quote';
-          if (!tradePoolAddress) throw new Error('No BNB Chain liquidity pool was found for QTM.');
-        }
+        const provider = new ethers.JsonRpcProvider(BSC_RPC_URL);
+        await ensureQtmTradePool(provider);
 
         const candleInterval = tradeInterval === '1m' ? 'day' : tradeInterval === '1w' ? 'hour' : tradeInterval === '1h' ? 'minute' : 'hour';
         const aggregate = tradeInterval === '1m' ? 1 : tradeInterval === '1w' ? 4 : 1;
@@ -1470,24 +1507,14 @@
       count.textContent = 'Loading…';
       body.innerHTML = '<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">Loading recent liquidity events…</td></tr>';
       try {
-        if (!tradePoolAddress) {
-          const poolPayload = await fetchGecko(`networks/bsc/tokens/${TRADE_TOKEN_ADDRESS}/pools`, { page: 1 });
-          const tokenKey = TRADE_TOKEN_ADDRESS.toLowerCase();
-          const pools = (poolPayload.data || []).filter(pool => {
-            const base = String(pool.relationships?.base_token?.data?.id || '').toLowerCase();
-            const quote = String(pool.relationships?.quote_token?.data?.id || '').toLowerCase();
-            return base.endsWith(`_${tokenKey}`) || quote.endsWith(`_${tokenKey}`);
-          }).sort((a, b) => Number(b.attributes?.reserve_in_usd || 0) - Number(a.attributes?.reserve_in_usd || 0));
-          tradePoolAddress = pools[0]?.attributes?.address || '';
-          if (!tradePoolAddress) throw new Error('No BNB Chain liquidity pool was found for QTM.');
-        }
-
         const provider = new ethers.JsonRpcProvider(BSC_RPC_URL);
+        await ensureQtmTradePool(provider);
         const pair = new ethers.Contract(tradePoolAddress, [
           'function token0() view returns (address)',
-          'function token1() view returns (address)'
+          'function token1() view returns (address)',
+          'function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)'
         ], provider);
-        const [token0, token1, latestBlock] = await Promise.all([pair.token0(), pair.token1(), provider.getBlockNumber()]);
+        const [token0, token1, reserves, latestBlock] = await Promise.all([pair.token0(), pair.token1(), pair.getReserves(), provider.getBlockNumber()]);
         const tokenAbi = ['function decimals() view returns (uint8)', 'function symbol() view returns (string)'];
         const [decimals0, decimals1, symbol0, symbol1] = await Promise.all([
           new ethers.Contract(token0, tokenAbi, provider).decimals(),
@@ -1500,6 +1527,19 @@
         const qtmDecimals = Number(qtmIs0 ? decimals0 : decimals1);
         const pairDecimals = Number(qtmIs0 ? decimals1 : decimals0);
         const pairSymbol = qtmIs0 ? symbol1 : symbol0;
+        const qtmReserve = ethers.formatUnits(qtmIs0 ? reserves.reserve0 : reserves.reserve1, qtmDecimals);
+        const pairReserve = ethers.formatUnits(qtmIs0 ? reserves.reserve1 : reserves.reserve0, pairDecimals);
+        document.getElementById('liquidityQtmReserve').textContent = `${formatAmount(qtmReserve)} QTM`;
+        document.getElementById('liquidityPairReserve').textContent = `${formatAmount(pairReserve)} ${pairSymbol}`;
+        document.getElementById('liquidityPairTitle').textContent = `${pairSymbol} in Pool`;
+        document.getElementById('liquidityPoolLabel').textContent = `QTM / ${pairSymbol} · PancakeSwap V2`;
+        try {
+          const poolPayload = await fetchGecko(`networks/bsc/pools/${tradePoolAddress}`);
+          const reserveUsd = Number(poolPayload.data?.attributes?.reserve_in_usd);
+          document.getElementById('liquidityTotalValue').textContent = Number.isFinite(reserveUsd) && reserveUsd > 0 ? formatUsd(reserveUsd) : '—';
+        } catch {
+          document.getElementById('liquidityTotalValue').textContent = '—';
+        }
         const iface = new ethers.Interface([
           'event Mint(address indexed sender, uint256 amount0, uint256 amount1)',
           'event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to)'
