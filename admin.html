@@ -776,18 +776,13 @@
           <div class="px-4 sm:px-5 py-3 border-t border-white/[0.06] text-[9px] text-gray-600">Live token data provided by GeckoTerminal API. Scroll horizontally to view all columns on small screens.</div>
           </div>
           <div id="marketLiquidityPanel" class="hidden" role="tabpanel">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 sm:p-5 border-b border-white/[0.06]">
-              <div class="rounded-xl bg-white/[0.025] border border-white/[0.07] p-3.5"><p class="text-[9px] uppercase tracking-wider text-gray-500">Total Pool Liquidity</p><p id="liquidityTotalValue" class="text-lg font-bold font-mono text-white mt-1">--</p><p id="liquidityPoolLabel" class="text-[9px] text-gray-500 mt-1">QTM pool</p></div>
-              <div class="rounded-xl bg-white/[0.025] border border-white/[0.07] p-3.5"><p class="text-[9px] uppercase tracking-wider text-gray-500">QTM in Pool</p><p id="liquidityQtmReserve" class="text-lg font-bold font-mono text-white mt-1">--</p><p class="text-[9px] text-gray-500 mt-1">Current on-chain reserve</p></div>
-              <div class="rounded-xl bg-white/[0.025] border border-white/[0.07] p-3.5"><p id="liquidityPairTitle" class="text-[9px] uppercase tracking-wider text-gray-500">Pair Reserve</p><p id="liquidityPairReserve" class="text-lg font-bold font-mono text-white mt-1">--</p><p class="text-[9px] text-gray-500 mt-1">Current on-chain reserve</p></div>
-            </div>
             <div class="overflow-x-auto">
               <table class="w-full min-w-[560px] text-left text-[11px]">
-                <thead class="bg-white/[0.02] text-[9px] uppercase tracking-wider text-gray-500"><tr><th class="px-4 sm:px-5 py-3 font-semibold">Event / Block</th><th class="px-3 py-3 font-semibold">QTM amount</th><th class="px-3 py-3 font-semibold">Pair token amount</th><th class="px-4 py-3 font-semibold text-right">Transaction</th></tr></thead>
-                <tbody id="liquidityRows"><tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">Open Liquidity to load recent pool events.</td></tr></tbody>
+                <thead class="bg-white/[0.02] text-[9px] uppercase tracking-wider text-gray-500"><tr><th class="px-4 sm:px-5 py-3 font-semibold">Type / Time</th><th class="px-3 py-3 font-semibold">QTM amount</th><th class="px-3 py-3 font-semibold">Paired asset amount</th><th class="px-4 py-3 font-semibold text-right">Transaction</th></tr></thead>
+                <tbody id="liquidityRows"><tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">Open Liquidity to load recent pool activity.</td></tr></tbody>
               </table>
             </div>
-            <div class="px-4 sm:px-5 py-3 border-t border-white/[0.06] text-[9px] text-gray-600">Recent PancakeSwap V2 pool liquidity events read from BNB Chain.</div>
+            <div class="px-4 sm:px-5 py-3 border-t border-white/[0.06] text-[9px] text-gray-600">Liquidity additions and removals from the QTM PancakeSwap V2 pool.</div>
           </div>
         </section>
       </div>
@@ -1313,6 +1308,15 @@
       return Number.isFinite(number) ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(number) : '—';
     }
 
+    function formatLiquidityAmount(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return '—';
+      return new Intl.NumberFormat('en-US', {
+        notation: Math.abs(number) >= 1000000 ? 'compact' : 'standard',
+        maximumFractionDigits: 3
+      }).format(number);
+    }
+
     function tradeTimestamp(value) {
       if (value === null || value === undefined || value === '') return null;
       const numeric = Number(value);
@@ -1348,12 +1352,13 @@
         const factory = new ethers.Contract(PANCAKE_V2_FACTORY_ADDRESS, [
           'function getPair(address tokenA, address tokenB) view returns (address)'
         ], provider);
-        const pairAddresses = await Promise.all(QTM_QUOTE_TOKENS.map(quote => factory.getPair(TRADE_TOKEN_ADDRESS, quote.address)));
-        const pairIndex = pairAddresses.findIndex(address => address !== ethers.ZeroAddress);
-        if (pairIndex >= 0) {
-          tradePoolAddress = pairAddresses[pairIndex];
+        for (const quote of QTM_QUOTE_TOKENS) {
+          const pairAddress = await factory.getPair(TRADE_TOKEN_ADDRESS, quote.address);
+          if (pairAddress === ethers.ZeroAddress) continue;
+          tradePoolAddress = pairAddress;
           const pair = new ethers.Contract(tradePoolAddress, ['function token0() view returns (address)'], provider);
           tradePoolTokenSide = (await pair.token0()).toLowerCase() === TRADE_TOKEN_ADDRESS.toLowerCase() ? 'base' : 'quote';
+          break;
         }
       }
 
@@ -1425,7 +1430,7 @@
       loading.classList.remove('hidden');
       let results;
       try {
-        const provider = new ethers.JsonRpcProvider(BSC_RPC_URL);
+        const provider = new ethers.JsonRpcProvider(BSC_RPC_URL, 56, { batchMaxCount: 1 });
         await ensureQtmTradePool(provider);
 
         const candleInterval = tradeInterval === '1m' ? 'day' : tradeInterval === '1w' ? 'hour' : tradeInterval === '1h' ? 'minute' : 'hour';
@@ -1507,14 +1512,13 @@
       count.textContent = 'Loading…';
       body.innerHTML = '<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">Loading recent liquidity events…</td></tr>';
       try {
-        const provider = new ethers.JsonRpcProvider(BSC_RPC_URL);
+        const provider = new ethers.JsonRpcProvider(BSC_RPC_URL, 56, { batchMaxCount: 1 });
         await ensureQtmTradePool(provider);
         const pair = new ethers.Contract(tradePoolAddress, [
           'function token0() view returns (address)',
-          'function token1() view returns (address)',
-          'function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)'
+          'function token1() view returns (address)'
         ], provider);
-        const [token0, token1, reserves, latestBlock] = await Promise.all([pair.token0(), pair.token1(), pair.getReserves(), provider.getBlockNumber()]);
+        const [token0, token1, latestBlock] = await Promise.all([pair.token0(), pair.token1(), provider.getBlockNumber()]);
         const tokenAbi = ['function decimals() view returns (uint8)', 'function symbol() view returns (string)'];
         const [decimals0, decimals1, symbol0, symbol1] = await Promise.all([
           new ethers.Contract(token0, tokenAbi, provider).decimals(),
@@ -1527,19 +1531,6 @@
         const qtmDecimals = Number(qtmIs0 ? decimals0 : decimals1);
         const pairDecimals = Number(qtmIs0 ? decimals1 : decimals0);
         const pairSymbol = qtmIs0 ? symbol1 : symbol0;
-        const qtmReserve = ethers.formatUnits(qtmIs0 ? reserves.reserve0 : reserves.reserve1, qtmDecimals);
-        const pairReserve = ethers.formatUnits(qtmIs0 ? reserves.reserve1 : reserves.reserve0, pairDecimals);
-        document.getElementById('liquidityQtmReserve').textContent = `${formatAmount(qtmReserve)} QTM`;
-        document.getElementById('liquidityPairReserve').textContent = `${formatAmount(pairReserve)} ${pairSymbol}`;
-        document.getElementById('liquidityPairTitle').textContent = `${pairSymbol} in Pool`;
-        document.getElementById('liquidityPoolLabel').textContent = `QTM / ${pairSymbol} · PancakeSwap V2`;
-        try {
-          const poolPayload = await fetchGecko(`networks/bsc/pools/${tradePoolAddress}`);
-          const reserveUsd = Number(poolPayload.data?.attributes?.reserve_in_usd);
-          document.getElementById('liquidityTotalValue').textContent = Number.isFinite(reserveUsd) && reserveUsd > 0 ? formatUsd(reserveUsd) : '—';
-        } catch {
-          document.getElementById('liquidityTotalValue').textContent = '—';
-        }
         const iface = new ethers.Interface([
           'event Mint(address indexed sender, uint256 amount0, uint256 amount1)',
           'event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to)'
@@ -1551,14 +1542,25 @@
         for (let start = fromBlock; start <= latestBlock; start += 2000) {
           ranges.push({ fromBlock: start, toBlock: Math.min(start + 1999, latestBlock), address: tradePoolAddress, topics: [[mintTopic, burnTopic]] });
         }
-        const logs = (await Promise.all(ranges.map(filter => provider.getLogs(filter)))).flat()
-          .sort((a, b) => Number(b.blockNumber - a.blockNumber)).slice(0, 40);
+        const logs = [];
+        for (const filter of ranges) logs.push(...await provider.getLogs(filter));
+        logs.sort((a, b) => Number(b.blockNumber - a.blockNumber));
+        logs.splice(30);
         if (requestId !== liquidityRequestId) return;
         if (!logs.length) {
-          body.innerHTML = '<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">No liquidity additions or removals found in the recent block range.</td></tr>';
+          body.innerHTML = '<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500">No recent liquidity additions or removals found for this pool.</td></tr>';
           count.textContent = '0 events';
           liquidityLoaded = true;
           return;
+        }
+        const blockTimes = new Map();
+        for (const blockNumber of [...new Set(logs.map(log => log.blockNumber))]) {
+          try {
+            const block = await provider.getBlock(blockNumber);
+            blockTimes.set(blockNumber, block?.timestamp ? new Date(Number(block.timestamp) * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+          } catch {
+            blockTimes.set(blockNumber, '—');
+          }
         }
         body.innerHTML = logs.map(log => {
           const parsed = iface.parseLog(log);
@@ -1568,7 +1570,7 @@
           const qtmAmount = ethers.formatUnits(qtmIs0 ? amount0 : amount1, qtmDecimals);
           const pairAmount = ethers.formatUnits(qtmIs0 ? amount1 : amount0, pairDecimals);
           const tx = encodeURIComponent(log.transactionHash);
-          return `<tr class="border-t border-white/[0.045] hover:bg-white/[0.025] transition-colors"><td class="px-4 sm:px-5 py-3"><div class="font-bold ${isAdd ? 'text-emerald-400' : 'text-rose-400'}">${isAdd ? 'Added' : 'Removed'}</div><div class="text-[9px] text-gray-500 mt-1">Block ${log.blockNumber.toLocaleString('en-US')}</div></td><td class="px-3 py-3 font-mono text-gray-200">${formatAmount(qtmAmount)} QTM</td><td class="px-3 py-3 font-mono text-gray-300">${formatAmount(pairAmount)} ${pairSymbol}</td><td class="px-4 py-3 text-right"><a class="inline-flex items-center gap-1 text-quantum-light hover:text-white" href="https://bscscan.com/tx/${tx}" target="_blank" rel="noopener noreferrer">${log.transactionHash.slice(0, 6)}…${log.transactionHash.slice(-4)} <i data-lucide="external-link" class="w-3 h-3"></i></a></td></tr>`;
+          return `<tr class="border-t border-white/[0.045] hover:bg-white/[0.025] transition-colors"><td class="px-4 sm:px-5 py-3"><div class="font-bold ${isAdd ? 'text-emerald-400' : 'text-rose-400'}">${isAdd ? 'Add Liquidity' : 'Remove Liquidity'}</div><div class="text-[9px] text-gray-500 mt-1">${blockTimes.get(log.blockNumber) || '—'}</div></td><td class="px-3 py-3 font-mono text-gray-200">${formatLiquidityAmount(qtmAmount)} QTM</td><td class="px-3 py-3 font-mono text-gray-300">${formatLiquidityAmount(pairAmount)} ${pairSymbol}</td><td class="px-4 py-3 text-right"><a class="inline-flex items-center gap-1 text-quantum-light hover:text-white" href="https://bscscan.com/tx/${tx}" target="_blank" rel="noopener noreferrer">${log.transactionHash.slice(0, 6)}…${log.transactionHash.slice(-4)} <i data-lucide="external-link" class="w-3 h-3"></i></a></td></tr>`;
         }).join('');
         count.textContent = `${logs.length} events`;
         liquidityLoaded = true;
